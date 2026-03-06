@@ -42,7 +42,7 @@ A real-time, peer-to-peer polling application built with Next.js, React, and Pee
 
 1. Clone the repository and navigate to the project directory:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/RookieZA/TeamsVoter
    cd TeamsVoter
    ```
 
