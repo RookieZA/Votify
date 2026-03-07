@@ -31,6 +31,19 @@
 - 💅 **Modern Styling**: Styled with Tailwind CSS v4 and `clsx` / `tailwind-merge` for robust utility class management.
 - 🌈 **Colour Scheme Switcher**: Choose from four built-in themes — **Light** (default), **Midnight**, **Vivid** (orange/purple), and **Ocean** (teal/emerald). Selection is persisted in `localStorage` and applied globally via a floating palette button.
 
+## 🎨 Colour Themes
+
+TeamsVoter ships with four built-in colour schemes. A floating **palette button** (bottom-right corner) lets you switch themes at any time — your selection is saved in `localStorage` so it persists across sessions.
+
+| Theme | Accent colours | Description |
+|-------|---------------|-------------|
+| ☀️ **Light** *(default)* | Indigo `#6366f1` · Purple `#a855f7` | Clean, bright background with vibrant indigo/purple accents |
+| 🌙 **Midnight** | Blue `#3b82f6` · Violet `#8b5cf6` | Dark background with cool blue/violet accents |
+| 🔥 **Vivid** | Orange `#f26419` · Purple `#7c3aed` | Dark background with punchy orange/purple contrast |
+| 🌊 **Ocean** | Cyan `#06b6d4` · Emerald `#10b981` | Dark background with refreshing teal/green tones |
+
+The active theme is applied as a `data-theme` attribute on `<html>` (e.g. `data-theme="midnight"`), and all CSS variables are scoped to each theme in `globals.css`.
+
 ## 🛠️ Tech Stack
 
 - **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
