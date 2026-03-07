@@ -31,7 +31,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {process.env.NEXT_PUBLIC_TRACKING_SCRIPT && (
-          <div dangerouslySetInnerHTML={{ __html: process.env.NEXT_PUBLIC_TRACKING_SCRIPT }} />
+          <div dangerouslySetInnerHTML={{
+            __html: process.env.NEXT_PUBLIC_TRACKING_SCRIPT.startsWith('"') && process.env.NEXT_PUBLIC_TRACKING_SCRIPT.endsWith('"')
+              ? JSON.parse(process.env.NEXT_PUBLIC_TRACKING_SCRIPT)
+              : process.env.NEXT_PUBLIC_TRACKING_SCRIPT
+          }} />
         )}
         {children}
       </body>
