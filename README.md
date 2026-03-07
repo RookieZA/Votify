@@ -44,6 +44,10 @@ TeamsVoter ships with four built-in colour schemes. A floating **palette button*
 
 The active theme is applied as a `data-theme` attribute on `<html>` (e.g. `data-theme="midnight"`), and all CSS variables are scoped to each theme in `globals.css`.
 
+<p align="center">
+  <img src="./assets/theme_switcher_demo.webp" alt="Theme Switcher Demo" width="800" />
+</p>
+
 ## 🛠️ Tech Stack
 
 - **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
