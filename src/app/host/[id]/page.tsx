@@ -14,7 +14,7 @@ export default function HostDashboard() {
     const router = useRouter();
     const hostId = params.id as string;
 
-    const { hostId: storedHostId, question, choices, addVote } = usePollStore();
+    const { hostId: storedHostId, question, choices, addVote, resetPoll } = usePollStore();
     const [isMounted, setIsMounted] = useState(false);
     const [copied, setCopied] = useState(false);
     const [origin, setOrigin] = useState("");
@@ -115,6 +115,17 @@ export default function HostDashboard() {
 
                 {/* Left Col: Info & QR */}
                 <div className="lg:col-span-1 space-y-6">
+                    {/* New Poll Button */}
+                    <button
+                        onClick={() => {
+                            resetPoll();
+                            router.push('/');
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-primary text-primary-foreground hover:brightness-110 transition-all font-bold shadow-lg shadow-primary/20"
+                    >
+                        Create New Poll
+                    </button>
+
                     <div className="glass rounded-2xl p-6 flex flex-col items-center text-center space-y-4">
                         <h2 className="text-xl font-semibold">Join the Poll</h2>
 
