@@ -39,6 +39,23 @@ export default function RootLayout({
             strategy="afterInteractive"
           />
         )}
+        {process.env.NEXT_PUBLIC_BUYMEACOFFEE_SLUG && (
+          <div className="fixed bottom-4 left-4 z-50">
+            <Script
+              src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js"
+              data-name="bmc-button"
+              data-slug={process.env.NEXT_PUBLIC_BUYMEACOFFEE_SLUG}
+              data-color="#FFDD00"
+              data-emoji="☕"
+              data-font="Cookie"
+              data-text="Buy me a coffee"
+              data-outline-color="#000000"
+              data-font-color="#000000"
+              data-coffee-color="#ffffff"
+              strategy="afterInteractive"
+            />
+          </div>
+        )}
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
