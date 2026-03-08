@@ -10,8 +10,9 @@ const voterIdSchema = z.string().min(1).max(100);
 
 const votePostSchema = z.object({
     hostId: hostIdSchema,
-    choiceId: choiceIdSchema,
+    choiceId: z.union([choiceIdSchema, z.array(choiceIdSchema)]),
     voterId: voterIdSchema,
+    pollType: z.string().optional(),
 });
 
 const voteGetSchema = z.object({
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid payload format' }, { status: 400 });
         }
 
-        const { hostId, choiceId, voterId } = parsed.data;
+        const { hostId, choiceId, voterId, pollType } = parsed.data;
 
         // Initialize host poll if it doesn't exist
         if (!store.has(hostId)) {
@@ -84,8 +85,26 @@ export async function POST(request: Request) {
 
         // Record the vote and the voter
         pollData.voters.add(voterId);
-        const currentCount = pollData.votes.get(choiceId) || 0;
-        pollData.votes.set(choiceId, currentCount + 1);
+
+        if (Array.isArray(choiceId)) {
+            if (pollType === 'ranked-choice') {
+                const n = choiceId.length;
+                choiceId.forEach((id, index) => {
+                    const points = n - index;
+                    const currentCount = pollData.votes.get(id) || 0;
+                    pollData.votes.set(id, currentCount + points);
+                });
+            } else {
+                choiceId.forEach(id => {
+                    const currentCount = pollData.votes.get(id) || 0;
+                    pollData.votes.set(id, currentCount + 1);
+                });
+            }
+        } else {
+            const finalChoiceId = (pollType === 'word-cloud') ? choiceId.trim().toLowerCase() : choiceId;
+            const currentCount = pollData.votes.get(finalChoiceId) || 0;
+            pollData.votes.set(finalChoiceId, currentCount + 1);
+        }
 
         // Convert Map to plain object for JSON response
         const votesObj = Object.fromEntries(pollData.votes);

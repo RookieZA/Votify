@@ -18,7 +18,10 @@
 ## 📸 See it in Action
 
 <p align="center">
-  <img src="./assets/demo_recording.webp" alt="TeamsVoter Demo Recording" width="800" />
+  <img src="./assets/host_qna.png" alt="TeamsVoter Host Q&A Dashboard" width="800" />
+</p>
+<p align="center">
+  <img src="./assets/join_page.png" alt="TeamsVoter Participant View" width="400" />
 </p>
 
 ## ✨ Features
@@ -28,6 +31,7 @@
 - 🔄 **Cross-Tab Syncing**: Leverages `zustand` with local storage persistence to act as a reliable fallback when PeerJS fails (especially useful for same-browser testing).
 - 🔗 **Auto-Generating Join Links**: Includes encoded poll data inside the join URL, so participants instantly see the question and choices without an initial server roundtrip.
 - 🎨 **Interactive UI**: Built with `framer-motion` for smooth percentage bar animations and `lucide-react` for beautiful iconography.
+- 📊 **Multiple Poll Types**: Supports traditional Multiple Choice, Ranked Choice voting, dynamic Word Clouds, and live Q&A Boards with upvoting.
 - 💅 **Modern Styling**: Styled with Tailwind CSS v4 and `clsx` / `tailwind-merge` for robust utility class management.
 - 🌈 **Colour Scheme Switcher**: Choose from four built-in themes — **Light** (default), **Midnight**, **Vivid** (orange/purple), and **Ocean** (teal/emerald). Selection is persisted in `localStorage` and applied globally via a floating palette button.
 
@@ -45,7 +49,7 @@ TeamsVoter ships with four built-in colour schemes. A floating **palette button*
 The active theme is applied as a `data-theme` attribute on `<html>` (e.g. `data-theme="midnight"`), and all CSS variables are scoped to each theme in `globals.css`.
 
 <p align="center">
-  <img src="./assets/theme_switcher_demo.webp" alt="Theme Switcher Demo" width="800" />
+  <img src="./assets/theme_switcher_demo.png" alt="Theme Switcher Demo" width="800" />
 </p>
 
 ## 🛠️ Tech Stack

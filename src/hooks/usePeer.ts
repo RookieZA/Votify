@@ -4,29 +4,52 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { DataConnection, Peer } from "peerjs";
 import { z } from "zod";
 
-export type VotePayload = {
-    type: "VOTE";
-    choiceId: string;
-    voterId: string;
-};
+export type PeerPayload =
+    | { type: "VOTE"; choiceId: string | string[]; voterId: string }
+    | { type: "EMOJI"; emoji: string; voterId: string }
+    | { type: "QNA_POST"; text: string; voterId: string }
+    | { type: "QNA_UPVOTE"; id: string; voterId: string };
 
-// Zod Schema to validate incoming P2P payloads
-const votePayloadSchema = z.object({
+const voteSchema = z.object({
     type: z.literal("VOTE"),
-    choiceId: z.string().min(1).max(100),
+    choiceId: z.union([z.string().min(1), z.array(z.string())]),
     voterId: z.string().min(1).max(100)
 });
 
-export function usePeer(customId?: string, onVote?: (payload: VotePayload, peerId: string) => void) {
+const emojiSchema = z.object({
+    type: z.literal("EMOJI"),
+    emoji: z.string(),
+    voterId: z.string().min(1).max(100)
+});
+
+const qnaPostSchema = z.object({
+    type: z.literal("QNA_POST"),
+    text: z.string().min(1),
+    voterId: z.string().min(1).max(100)
+});
+
+const qnaUpvoteSchema = z.object({
+    type: z.literal("QNA_UPVOTE"),
+    id: z.string().min(1),
+    voterId: z.string().min(1).max(100)
+});
+
+const payloadSchema = z.discriminatedUnion("type", [
+    voteSchema,
+    emojiSchema,
+    qnaPostSchema,
+    qnaUpvoteSchema
+]);
+
+export function usePeer(customId?: string, onPayload?: (payload: PeerPayload, peerId: string) => void) {
     const [peerId, setPeerId] = useState<string | null>(null);
     const [connections, setConnections] = useState<DataConnection[]>([]);
     const peerInstance = useRef<Peer | null>(null);
 
-    // Keep the latest callback reference to avoid re-triggering useEffect
-    const onVoteRef = useRef(onVote);
+    const onPayloadRef = useRef(onPayload);
     useEffect(() => {
-        onVoteRef.current = onVote;
-    }, [onVote]);
+        onPayloadRef.current = onPayload;
+    }, [onPayload]);
 
     useEffect(() => {
         let isMounted = true;
@@ -50,10 +73,9 @@ export function usePeer(customId?: string, onVote?: (payload: VotePayload, peerI
                         setConnections((prev) => [...prev, conn]);
 
                         conn.on("data", (data) => {
-                            // Validate the incoming data from other peers using Zod
-                            const parsed = votePayloadSchema.safeParse(data);
-                            if (parsed.success && onVoteRef.current) {
-                                onVoteRef.current(parsed.data, conn.peer);
+                            const parsed = payloadSchema.safeParse(data);
+                            if (parsed.success && onPayloadRef.current) {
+                                onPayloadRef.current(parsed.data, conn.peer);
                             } else if (!parsed.success) {
                                 console.warn("Received invalid P2P payload format", parsed.error);
                             }

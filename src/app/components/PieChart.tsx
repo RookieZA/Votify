@@ -141,7 +141,6 @@ export default function PieChart({ choices }: PieChartProps) {
                     d={d}
                     fill={s.color}
                     animate={{
-                      d,
                       scale: isFlash ? 1.05 : 1,
                       filter: isFlash
                         ? `drop-shadow(0 0 16px ${s.color}) brightness(1.3)`
@@ -150,7 +149,6 @@ export default function PieChart({ choices }: PieChartProps) {
                     }}
                     initial={{ opacity: 0, scale: 0.8 }}
                     transition={{
-                      d: { type: "spring", stiffness: 120, damping: 20 },
                       scale: { type: "spring", stiffness: 300, damping: 18 },
                       filter: { duration: 0.35 },
                       opacity: { duration: 0.4 },

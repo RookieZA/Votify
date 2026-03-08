@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { DataConnection, Peer } from "peerjs";
-import { VotePayload } from "./usePeer";
+import { PeerPayload } from "./usePeer";
 
-export function usePeerConnection(hostId: string) {
+export function usePeerConnection(hostId: string, onMessage?: (data: any) => void) {
     const [status, setStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
     const connInstance = useRef<DataConnection | null>(null);
     const peerInstance = useRef<Peer | null>(null);
@@ -34,6 +34,10 @@ export function usePeerConnection(hostId: string) {
                                 clearInterval(pollInterval);
                                 pollInterval = null;
                             }
+                        });
+
+                        conn.on("data", (data) => {
+                            if (onMessage) onMessage(data);
                         });
 
                         // Fallback: poll conn.open every 100ms.
@@ -95,17 +99,17 @@ export function usePeerConnection(hostId: string) {
         };
     }, [hostId]);
 
-    const sendVote = useCallback((choiceId: string, voterId: string): boolean => {
+    const sendMessage = useCallback((payload: PeerPayload): boolean => {
         const conn = connInstance.current;
         // Optimistically send if conn.open is true, even if the 'open' event hasn't fired yet.
         // This helps in cases where the event is delayed or doesn't fire due to the PeerJS bug.
         if (conn && (isConnectedRef.current || conn.open)) {
-            conn.send({ type: "VOTE", choiceId, voterId } as VotePayload);
+            conn.send(payload);
             return true;
         }
         return false;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status]); // re-create when status changes so the button reacts
 
-    return { status, sendVote };
+    return { status, sendMessage };
 }
