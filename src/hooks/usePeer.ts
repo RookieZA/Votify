@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { DataConnection, Peer } from "peerjs";
 import { z } from "zod";
+import { randomId } from "@/lib/utils";
 
 export type PeerPayload =
     | { type: "VOTE"; choiceId: string | string[]; voterId: string }
@@ -12,19 +13,19 @@ export type PeerPayload =
 
 const voteSchema = z.object({
     type: z.literal("VOTE"),
-    choiceId: z.union([z.string().min(1), z.array(z.string())]),
+    choiceId: z.union([z.string().min(1).max(500), z.array(z.string().min(1).max(500)).max(100)]),
     voterId: z.string().min(1).max(100)
 });
 
 const emojiSchema = z.object({
     type: z.literal("EMOJI"),
-    emoji: z.string(),
+    emoji: z.string().min(1).max(32),
     voterId: z.string().min(1).max(100)
 });
 
 const qnaPostSchema = z.object({
     type: z.literal("QNA_POST"),
-    text: z.string().min(1),
+    text: z.string().min(1).max(1000),
     voterId: z.string().min(1).max(100)
 });
 
@@ -57,7 +58,7 @@ export function usePeer(customId?: string, onPayload?: (payload: PeerPayload, pe
             import("peerjs").then(({ default: Peer }) => {
                 if (!isMounted) return;
                 try {
-                    const id = customId || `poll-${Math.random().toString(36).substring(2, 9)}`;
+                    const id = customId || `poll-${randomId()}`;
                     const peer = new Peer(id);
 
                     peer.on("open", (id) => {

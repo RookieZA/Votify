@@ -2,11 +2,29 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { z } from "zod";
 import { decodeData, getOrCreateVoterId } from "@/lib/utils";
 import { usePeerConnection } from "@/hooks/usePeerConnection";
 import { usePollStore, PollType } from "@/lib/store";
 import { CheckCircle2, AlertTriangle, Loader2, Send, Lock, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const POLL_TYPES = ['multiple-choice', 'multiple-select', 'word-cloud', 'ranked-choice', 'qna'] as const;
+
+// Shape of the poll payload carried in the join URL / host broadcasts. Both come
+// from an untrusted source (crafted URL, or any peer acting as host), so validate.
+const joinQuestionSchema = z.object({
+    q: z.string().min(1),
+    t: z.enum(POLL_TYPES).optional(),
+    c: z.array(z.object({ i: z.string(), l: z.string() })).default([]),
+});
+
+const stateChangeSchema = z.object({
+    type: z.literal("STATE_CHANGE"),
+    status: z.enum(['open', 'paused', 'closed']).optional(),
+    action: z.literal("next_question").optional(),
+    data: joinQuestionSchema.optional(),
+});
 
 interface JoinQuestion {
     q: string;
@@ -32,18 +50,19 @@ function JoinScreen() {
     const [isMounted, setIsMounted] = useState(false);
     const [localEmojis, setLocalEmojis] = useState<{ id: string; emoji: string; x: number }[]>([]);
 
-    const { status, sendMessage } = usePeerConnection(peerId || "", (data: any) => {
-        if (data.type === "STATE_CHANGE") {
-            if (data.status) setHostStatus(data.status);
-            if (data.action === "next_question") {
-                // The Host advanced the poll
-                setPoll(data.data as JoinQuestion);
-                setVoted(false);
-                setSelectedId(null);
-                setSelectedIds([]);
-                setTextInput("");
-                setHostStatus('open');
-            }
+    const { status, sendMessage } = usePeerConnection(peerId || "", (data: unknown) => {
+        const parsed = stateChangeSchema.safeParse(data);
+        if (!parsed.success) return;
+        const msg = parsed.data;
+        if (msg.status) setHostStatus(msg.status);
+        if (msg.action === "next_question" && msg.data) {
+            // The Host advanced the poll
+            setPoll({ t: 'multiple-choice', ...msg.data } as JoinQuestion);
+            setVoted(false);
+            setSelectedId(null);
+            setSelectedIds([]);
+            setTextInput("");
+            setHostStatus('open');
         }
     });
 
@@ -52,11 +71,11 @@ function JoinScreen() {
     useEffect(() => {
         setIsMounted(true);
         if (dataB64) {
-            const decoded = decodeData<JoinQuestion>(dataB64);
-            if (decoded && decoded.q) {
+            const decoded = decodeData<unknown>(dataB64);
+            const parsed = joinQuestionSchema.safeParse(decoded);
+            if (parsed.success) {
                 // If it's an older payload without 't', default to multiple-choice
-                if (!decoded.t) decoded.t = 'multiple-choice';
-                setPoll(decoded);
+                setPoll({ t: 'multiple-choice', ...parsed.data } as JoinQuestion);
             } else {
                 setError("Invalid poll data.");
             }
