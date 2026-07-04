@@ -6,7 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Users, Copy, CheckCircle2, AlertTriangle, EyeOff, Eye, PauseCircle, PlayCircle, StopCircle, ArrowRight, Download, Heart } from "lucide-react";
 import { usePollStore, useHistoryStore } from "@/lib/store";
 import { usePeer } from "@/hooks/usePeer";
-import { encodeData } from "@/lib/utils";
+import { encodeData, randomId } from "@/lib/utils";
 import PieChart from "@/app/components/PieChart";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -48,7 +48,7 @@ export default function HostDashboard() {
         }
     }, [isMounted, storedHostId, hostId, router]);
 
-    // Fallback sync logic omited for brevity, or simplified
+    // Fallback sync logic, simplified
     useEffect(() => {
         if (!isMounted || storedHostId !== hostId) return;
 
@@ -107,7 +107,7 @@ export default function HostDashboard() {
                                             updated = true;
                                         }
                                     } else {
-                                        newChoices.push({ id: Math.random().toString(36).substring(7), label: key, votes: apiVotes });
+                                        newChoices.push({ id: randomId(), label: key, votes: apiVotes });
                                         updated = true;
                                     }
                                 } else {
@@ -234,26 +234,37 @@ export default function HostDashboard() {
     };
 
     const exportCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,";
+        // Escape a value for CSV, and neutralise spreadsheet formula injection by
+        // prefixing cells that begin with a formula trigger (= + - @, tab, CR).
+        const csvCell = (value: string) => {
+            let v = value ?? "";
+            if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+            return `"${v.replace(/"/g, '""')}"`;
+        };
+
+        const rows: string[] = [];
         if (pollType === 'qna') {
-            csvContent += "Question,Upvotes\\n";
+            rows.push("Question,Upvotes");
             qnaItems.forEach(item => {
-                csvContent += `"${item.text.replace(/"/g, '""')}",${item.upvotes}\\n`;
+                rows.push(`${csvCell(item.text)},${item.upvotes}`);
             });
         } else {
-            csvContent += "Option,Votes\\n";
+            rows.push("Option,Votes");
             choices.forEach(c => {
-                csvContent += `"${c.label.replace(/"/g, '""')}",${c.votes}\\n`;
+                rows.push(`${csvCell(c.label)},${c.votes}`);
             });
         }
 
-        const encodedUri = encodeURI(csvContent);
+        const csvContent = rows.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", url);
         link.setAttribute("download", `poll_results_${hostId}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     if (!isMounted || storedHostId !== hostId) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -342,14 +353,14 @@ export default function HostDashboard() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setResultsHidden(!resultsHidden)}
-                                className={`flexItemsCenter gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${resultsHidden ? 'bg-indigo-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                                className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${resultsHidden ? 'bg-indigo-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
                             >
                                 {resultsHidden ? <><Eye className="w-4 h-4 mr-2" /> Show Results</> : <><EyeOff className="w-4 h-4 mr-2" /> Hide Results</>}
                             </button>
                             {status !== 'closed' && (
                                 <button
                                     onClick={handlePauseToggle}
-                                    className={`flexItemsCenter gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${status === 'paused' ? 'bg-yellow-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                                    className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${status === 'paused' ? 'bg-yellow-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
                                 >
                                     {status === 'paused' ? <><PlayCircle className="w-4 h-4 mr-2" /> Resume</> : <><PauseCircle className="w-4 h-4 mr-2" /> Pause</>}
                                 </button>
@@ -475,9 +486,7 @@ export default function HostDashboard() {
                                                     className="p-6 rounded-2xl bg-background/50 border border-border flex gap-4"
                                                 >
                                                     <div className="flex flex-col items-center justify-start gap-1">
-                                                        <button className="text-foreground/40 hover:text-primary transition-colors">
-                                                            ▲
-                                                        </button>
+                                                        <span className="text-foreground/40" aria-hidden="true">▲</span>
                                                         <span className="font-bold text-lg">{item.upvotes}</span>
                                                     </div>
                                                     <div className="flex-1 text-lg pt-1">

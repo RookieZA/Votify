@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePollStore, PollType, QuestionData } from "@/lib/store";
+import { randomId } from "@/lib/utils";
 import { PlusCircle, Trash2, ArrowRight, ArrowLeft, Plus } from "lucide-react";
 
 function CreateForm() {
@@ -17,7 +18,7 @@ function CreateForm() {
     // Support for multiple questions in a single session
     const [questions, setQuestions] = useState<QuestionData[]>([
         {
-            id: Math.random().toString(36).substring(7),
+            id: randomId(),
             question: "",
             choices: isChoicesNeeded ? [{ id: "1", label: "", votes: 0 }, { id: "2", label: "", votes: 0 }] : []
         }
@@ -27,9 +28,9 @@ function CreateForm() {
         setQuestions([
             ...questions,
             {
-                id: Math.random().toString(36).substring(7),
+                id: randomId(),
                 question: "",
-                choices: isChoicesNeeded ? [{ id: Math.random().toString(36).substring(7), label: "", votes: 0 }, { id: Math.random().toString(36).substring(7), label: "", votes: 0 }] : []
+                choices: isChoicesNeeded ? [{ id: randomId(), label: "", votes: 0 }, { id: randomId(), label: "", votes: 0 }] : []
             }
         ]);
     };
@@ -47,7 +48,7 @@ function CreateForm() {
 
     const handleAddChoice = (qIndex: number) => {
         const newQs = [...questions];
-        newQs[qIndex].choices.push({ id: Math.random().toString(36).substring(7), label: "", votes: 0 });
+        newQs[qIndex].choices.push({ id: randomId(), label: "", votes: 0 });
         setQuestions(newQs);
     };
 
@@ -82,7 +83,7 @@ function CreateForm() {
 
         if (validQs.length === 0) return;
 
-        const hostId = `poll-${Math.random().toString(36).substring(2, 9)}`;
+        const hostId = `poll-${randomId()}`;
         setPoll(hostId, type, validQs);
         router.push(`/host/${hostId}`);
     };

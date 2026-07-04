@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { randomId } from './utils';
 
 export type PollType = 'multiple-choice' | 'multiple-select' | 'word-cloud' | 'ranked-choice' | 'qna';
 
@@ -113,7 +114,7 @@ export const usePollStore = create<PollState>()(
                         });
                     } else {
                         set({
-                            choices: [...state.choices, { id: Math.random().toString(36).substring(7), label: payload.trim(), votes: 1 }],
+                            choices: [...state.choices, { id: randomId(), label: payload.trim(), votes: 1 }],
                             votedUsers: voterId ? [...state.votedUsers, voterId] : state.votedUsers
                         });
                     }
@@ -143,7 +144,7 @@ export const usePollStore = create<PollState>()(
             addQnaItem: (text: string, userId: string) => {
                 const state = get();
                 const newItem: QnaItem = {
-                    id: Math.random().toString(36).substring(7),
+                    id: randomId(),
                     text,
                     upvotes: 0,
                     userId,

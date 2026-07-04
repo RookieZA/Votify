@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,9 @@ const voterIdSchema = z.string().min(1).max(100);
 
 const votePostSchema = z.object({
     hostId: hostIdSchema,
-    choiceId: z.union([choiceIdSchema, z.array(choiceIdSchema)]),
+    choiceId: z.union([choiceIdSchema, z.array(choiceIdSchema).max(100)]),
     voterId: voterIdSchema,
-    pollType: z.string().optional(),
+    pollType: z.string().max(50).optional(),
 });
 
 const voteGetSchema = z.object({
@@ -27,38 +28,16 @@ if (!globalAny.votesStore) {
 }
 const store: Map<string, { votes: Map<string, number>, voters: Set<string> }> = globalAny.votesStore;
 
-// Basic Rate Limiting Store
-if (!globalAny.rateLimitStore) {
-    globalAny.rateLimitStore = new Map<string, { count: number, resetAt: number }>();
-}
-const rateLimitStore: Map<string, { count: number, resetAt: number }> = globalAny.rateLimitStore;
-
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 30; // 30 votes per minute per IP
-
-function isRateLimited(ip: string): boolean {
-    const now = Date.now();
-    const record = rateLimitStore.get(ip);
-
-    if (!record || record.resetAt < now) {
-        // Create new record or reset expired one
-        rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-        return false;
-    }
-
-    if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-        return true;
-    }
-
-    // Increment count
-    record.count++;
-    return false;
-}
+// Bounds to prevent unbounded memory growth from unauthenticated input.
+const MAX_POLLS = 10_000;
+const MAX_VOTERS_PER_POLL = 100_000;
+const MAX_CHOICES_PER_POLL = 5_000; // e.g. distinct word-cloud entries
 
 export async function POST(request: Request) {
     try {
-        const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-        if (ip !== 'unknown' && isRateLimited(ip)) {
+        const ip = getClientIp(request);
+        if (ip !== 'unknown' && isRateLimited(`vote:${ip}`, MAX_REQUESTS_PER_WINDOW)) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
@@ -73,6 +52,9 @@ export async function POST(request: Request) {
 
         // Initialize host poll if it doesn't exist
         if (!store.has(hostId)) {
+            if (store.size >= MAX_POLLS) {
+                return NextResponse.json({ error: 'Service busy, try again later' }, { status: 503 });
+            }
             store.set(hostId, { votes: new Map<string, number>(), voters: new Set<string>() });
         }
 
@@ -83,6 +65,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Already voted' }, { status: 409 });
         }
 
+        if (pollData.voters.size >= MAX_VOTERS_PER_POLL) {
+            return NextResponse.json({ error: 'Poll is full' }, { status: 429 });
+        }
+
+        // Only count votes for choices we can track without unbounded growth.
+        // New keys (e.g. word-cloud entries) are rejected once the cap is hit.
+        const canAddNewChoice = (id: string) =>
+            pollData.votes.has(id) || pollData.votes.size < MAX_CHOICES_PER_POLL;
+
         // Record the vote and the voter
         pollData.voters.add(voterId);
 
@@ -90,20 +81,24 @@ export async function POST(request: Request) {
             if (pollType === 'ranked-choice') {
                 const n = choiceId.length;
                 choiceId.forEach((id, index) => {
+                    if (!canAddNewChoice(id)) return;
                     const points = n - index;
                     const currentCount = pollData.votes.get(id) || 0;
                     pollData.votes.set(id, currentCount + points);
                 });
             } else {
                 choiceId.forEach(id => {
+                    if (!canAddNewChoice(id)) return;
                     const currentCount = pollData.votes.get(id) || 0;
                     pollData.votes.set(id, currentCount + 1);
                 });
             }
         } else {
             const finalChoiceId = (pollType === 'word-cloud') ? choiceId.trim().toLowerCase() : choiceId;
-            const currentCount = pollData.votes.get(finalChoiceId) || 0;
-            pollData.votes.set(finalChoiceId, currentCount + 1);
+            if (canAddNewChoice(finalChoiceId)) {
+                const currentCount = pollData.votes.get(finalChoiceId) || 0;
+                pollData.votes.set(finalChoiceId, currentCount + 1);
+            }
         }
 
         // Convert Map to plain object for JSON response
