@@ -491,21 +491,8 @@ export default function HostDashboard() {
                                 )}
 
                                 {pollType === 'ranked-choice' && (
-                                    <div className="space-y-3 w-full max-w-2xl mx-auto">
-                                        {[...choices].sort((a, b) => b.votes - a.votes).map((c, idx) => (
-                                            <motion.div
-                                                key={c.id}
-                                                layout
-                                                transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                                                className={`flex items-center gap-4 rounded-2xl px-5 py-4 ${idx === 0 ? 'bg-secondary shadow-sm' : 'bg-secondary/60'}`}
-                                            >
-                                                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold tabular-nums ${idx === 0 ? 'bg-yellow-400/20 text-yellow-500' : idx === 1 ? 'bg-gray-400/20 text-gray-400' : idx === 2 ? 'bg-orange-600/20 text-orange-500' : 'bg-primary/10 text-primary'}`}>
-                                                    {idx + 1}
-                                                </div>
-                                                <div className={`flex-1 text-lg md:text-xl font-semibold tracking-tight ${idx === 0 ? '' : 'text-foreground/75'}`}>{c.label}</div>
-                                                <div className="text-foreground/50 text-sm font-medium tabular-nums">{c.votes} pts</div>
-                                            </motion.div>
-                                        ))}
+                                    <div className="w-full max-w-3xl mx-auto">
+                                        <BarResults choices={choices} ranked />
                                     </div>
                                 )}
 

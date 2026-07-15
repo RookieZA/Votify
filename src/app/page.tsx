@@ -50,7 +50,7 @@ const pollTypes: PollTypeCard[] = [
   {
     type: "ranked-choice",
     title: "Ranked Choice",
-    description: "Have the room rank options by preference and reveal the true winner.",
+    description: "Everyone picks their favorite — watch the ranking emerge live as votes come in.",
     icon: ListOrdered,
     gradient: ["#ffb84d", "#ff9f0a"],
   },

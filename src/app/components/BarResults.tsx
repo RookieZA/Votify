@@ -46,28 +46,58 @@ function AnimatedNumber({ value }: { value: number }) {
 
 interface BarResultsProps {
   choices: Choice[];
+  /**
+   * Sort by vote count (most-voted first) and show a rank badge per row,
+   * with the top three medal-coloured. Use for single-pick "ranked choice"
+   * polls where the ranking itself is the result.
+   */
+  ranked?: boolean;
 }
+
+const RANK_BADGE_CLASSES = [
+  "bg-yellow-400/20 text-yellow-500",
+  "bg-gray-400/20 text-gray-400",
+  "bg-orange-600/20 text-orange-500",
+];
 
 /**
  * Projector-grade live results: large labels and percentages over full-width
  * animated bars, with the current leader glowing in its own colour.
  */
-export default function BarResults({ choices }: BarResultsProps) {
+export default function BarResults({ choices, ranked = false }: BarResultsProps) {
   const palette = usePalette();
   const total = choices.reduce((s, c) => s + c.votes, 0);
   const max = Math.max(...choices.map((c) => c.votes), 0);
 
+  // Colour is keyed to each choice's original position so it stays stable
+  // even as `ranked` reorders rows while votes come in.
+  const colorFor = (id: string) => {
+    const idx = choices.findIndex((c) => c.id === id);
+    return palette[idx % palette.length];
+  };
+
+  const ordered = ranked ? [...choices].sort((a, b) => b.votes - a.votes) : choices;
+
   return (
     <div className="w-full space-y-6">
-      {choices.map((c, i) => {
+      {ordered.map((c, i) => {
         const pct = total === 0 ? 0 : (c.votes / total) * 100;
         const isLeader = max > 0 && c.votes === max;
-        const color = palette[i % palette.length];
+        const color = colorFor(c.id);
         return (
-          <div key={c.id}>
+          <motion.div key={c.id} layout transition={{ type: "spring", stiffness: 300, damping: 28 }}>
             <div className="mb-2 flex items-end justify-between gap-4">
-              <span className={`text-lg md:text-2xl font-semibold tracking-tight ${isLeader ? "text-foreground" : "text-foreground/75"}`}>
-                {c.label}
+              <span className="flex items-center gap-3 min-w-0">
+                {ranked && (
+                  <span
+                    className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums ${RANK_BADGE_CLASSES[i] ?? "bg-primary/10 text-primary"}`}
+                  >
+                    {i + 1}
+                  </span>
+                )}
+                <span className={`text-lg md:text-2xl font-semibold tracking-tight truncate ${isLeader ? "text-foreground" : "text-foreground/75"}`}>
+                  {c.label}
+                </span>
               </span>
               <span className="flex items-baseline gap-2 whitespace-nowrap">
                 <span
@@ -82,18 +112,16 @@ export default function BarResults({ choices }: BarResultsProps) {
               </span>
             </div>
             <div className="h-3.5 md:h-4 w-full overflow-hidden rounded-full bg-secondary">
-              <motion.div
-                className="h-full rounded-full"
+              <div
+                className="h-full rounded-full transition-[width] duration-700 ease-out"
                 style={{
                   background: color,
                   boxShadow: isLeader ? `0 0 16px ${color}80` : undefined,
+                  width: `${pct}%`,
                 }}
-                initial={{ width: "0%" }}
-                animate={{ width: `${pct}%` }}
-                transition={{ type: "spring", stiffness: 120, damping: 22 }}
               />
             </div>
-          </div>
+          </motion.div>
         );
       })}
 

@@ -133,20 +133,10 @@ export const usePollStore = create<PollState>()(
                             votedUsers: voterId ? [...state.votedUsers, voterId] : state.votedUsers
                         });
                     }
-                } else if (state.pollType === 'ranked-choice' && Array.isArray(payload)) {
-                    // payload is ordered array of choiceIds: [first, second, third]
-                    // Award points: 1st = n points, 2nd = n-1, etc.
-                    const n = payload.length;
-                    set({
-                        choices: state.choices.map(c => {
-                            const index = payload.indexOf(c.id);
-                            const points = index !== -1 ? (n - index) : 0;
-                            return { ...c, votes: c.votes + points };
-                        }),
-                        votedUsers: voterId ? [...state.votedUsers, voterId] : state.votedUsers
-                    });
                 } else if (typeof payload === 'string') {
-                    // Default multiple choice
+                    // Default: multiple-choice and ranked-choice both cast a single
+                    // vote for one choice; ranked-choice's ranking comes purely from
+                    // sorting by vote count, not per-vote weighting.
                     set({
                         choices: state.choices.map((c) =>
                             c.id === payload ? { ...c, votes: c.votes + 1 } : c

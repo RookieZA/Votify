@@ -152,21 +152,13 @@ export async function POST(request: Request) {
         pollData.voters.add(voterId);
 
         if (Array.isArray(choiceId)) {
-            if (pollType === 'ranked-choice') {
-                const n = choiceId.length;
-                choiceId.forEach((id, index) => {
-                    if (!canAddNewChoice(id)) return;
-                    const points = n - index;
-                    const currentCount = pollData.votes.get(id) || 0;
-                    pollData.votes.set(id, currentCount + points);
-                });
-            } else {
-                choiceId.forEach(id => {
-                    if (!canAddNewChoice(id)) return;
-                    const currentCount = pollData.votes.get(id) || 0;
-                    pollData.votes.set(id, currentCount + 1);
-                });
-            }
+            // Only multiple-select sends an array; ranked-choice and
+            // multiple-choice both send a single choiceId (see below).
+            choiceId.forEach(id => {
+                if (!canAddNewChoice(id)) return;
+                const currentCount = pollData.votes.get(id) || 0;
+                pollData.votes.set(id, currentCount + 1);
+            });
         } else {
             const finalChoiceId = (pollType === 'word-cloud') ? choiceId.trim().toLowerCase() : choiceId;
             if (canAddNewChoice(finalChoiceId)) {

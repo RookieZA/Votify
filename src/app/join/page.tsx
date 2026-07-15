@@ -96,22 +96,14 @@ function JoinScreen() {
     if (!isMounted) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
     if (!poll) return null;
 
-    const handleSelectRanked = (id: string) => {
-        if (selectedIds.includes(id)) {
-            setSelectedIds(selectedIds.filter(x => x !== id));
-        } else {
-            setSelectedIds([...selectedIds, id]);
-        }
-    }
-
     const handleVote = async () => {
         if (voted || hostStatus !== 'open' || isSubmittingRef.current) return;
 
         let payloadContent: string | string[] | null = null;
-        if (poll.t === 'multiple-choice') {
+        if (poll.t === 'multiple-choice' || poll.t === 'ranked-choice') {
             if (!selectedId) return;
             payloadContent = selectedId;
-        } else if (poll.t === 'multiple-select' || poll.t === 'ranked-choice') {
+        } else if (poll.t === 'multiple-select') {
             if (selectedIds.length === 0) return;
             payloadContent = selectedIds;
         } else if (poll.t === 'word-cloud') {
@@ -216,9 +208,8 @@ function JoinScreen() {
     }
 
     const isSubmitDisabled = voted || hostStatus !== 'open' || isSubmitting ||
-        (poll.t === 'multiple-choice' && !selectedId) ||
+        ((poll.t === 'multiple-choice' || poll.t === 'ranked-choice') && !selectedId) ||
         (poll.t === 'multiple-select' && selectedIds.length === 0) ||
-        (poll.t === 'ranked-choice' && selectedIds.length !== poll.c.length) ||
         ((poll.t === 'word-cloud' || poll.t === 'qna') && textInput.trim().length === 0);
 
     return (
@@ -264,22 +255,31 @@ function JoinScreen() {
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     className="space-y-4"
                                 >
-                                    {poll.t === 'multiple-choice' && poll.c.map((choice) => (
-                                        <button
-                                            key={choice.i}
-                                            onClick={() => setSelectedId(choice.i)}
-                                            aria-pressed={selectedId === choice.i}
-                                            className={`w-full px-5 py-4 rounded-2xl text-left flex justify-between items-center transition-all ${selectedId === choice.i
-                                                ? "bg-primary/10 ring-2 ring-primary"
-                                                : "bg-secondary hover:brightness-105 active:scale-[0.99]"
-                                                }`}
-                                        >
-                                            <span className="font-medium text-[17px]">{choice.l}</span>
-                                            {selectedId === choice.i && (
-                                                <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" aria-hidden="true" />
+                                    {(poll.t === 'multiple-choice' || poll.t === 'ranked-choice') && (
+                                        <>
+                                            {poll.t === 'ranked-choice' && (
+                                                <p className="text-sm text-foreground/60">
+                                                    Pick your favorite — the most popular pick ranks #1.
+                                                </p>
                                             )}
-                                        </button>
-                                    ))}
+                                            {poll.c.map((choice) => (
+                                                <button
+                                                    key={choice.i}
+                                                    onClick={() => setSelectedId(choice.i)}
+                                                    aria-pressed={selectedId === choice.i}
+                                                    className={`w-full px-5 py-4 rounded-2xl text-left flex justify-between items-center transition-all ${selectedId === choice.i
+                                                        ? "bg-primary/10 ring-2 ring-primary"
+                                                        : "bg-secondary hover:brightness-105 active:scale-[0.99]"
+                                                        }`}
+                                                >
+                                                    <span className="font-medium text-[17px]">{choice.l}</span>
+                                                    {selectedId === choice.i && (
+                                                        <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" aria-hidden="true" />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
                                     {poll.t === 'multiple-select' && poll.c.map((choice) => (
                                         <button
@@ -300,33 +300,6 @@ function JoinScreen() {
                                             )}
                                         </button>
                                     ))}
-
-                                    {poll.t === 'ranked-choice' && (
-                                        <div className="space-y-2.5">
-                                            <p className="text-sm text-foreground/60 mb-4">Tap options in order of preference.</p>
-                                            {poll.c.map((choice) => {
-                                                const rank = selectedIds.indexOf(choice.i) + 1;
-                                                const isSelected = rank > 0;
-                                                return (
-                                                    <button
-                                                        key={choice.i}
-                                                        onClick={() => handleSelectRanked(choice.i)}
-                                                        aria-pressed={isSelected}
-                                                        aria-label={isSelected ? `${choice.l}, rank ${rank}` : `Select ${choice.l}`}
-                                                        className={`w-full px-5 py-4 rounded-2xl text-left flex items-center transition-all gap-4 ${isSelected
-                                                            ? "bg-primary/10 ring-2 ring-primary"
-                                                            : "bg-secondary hover:brightness-105 active:scale-[0.99]"
-                                                            }`}
-                                                    >
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm tabular-nums transition-all ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-background/60 text-transparent'}`}>
-                                                            {isSelected ? rank : ''}
-                                                        </div>
-                                                        <span className="font-medium text-[17px]">{choice.l}</span>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
 
                                     {['word-cloud', 'qna'].includes(poll.t) && (
                                         <div className="space-y-2.5">
