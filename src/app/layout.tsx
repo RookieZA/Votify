@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LivePoll by Votify",
-  description: "Real-time, stateless P2P polling system",
+  title: "Votify — Live audience polls, instantly",
+  description:
+    "Create real-time, peer-to-peer polls, word clouds, and Q&A sessions in seconds. No database, no sign-up.",
 };
 
 export default function RootLayout({
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <div className="aurora" aria-hidden="true" />
         {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && process.env.NEXT_PUBLIC_PLAUSIBLE_URL && (
           <Script
             defer

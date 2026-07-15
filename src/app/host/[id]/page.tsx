@@ -3,11 +3,12 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Users, Copy, CheckCircle2, AlertTriangle, EyeOff, Eye, PauseCircle, PlayCircle, StopCircle, ArrowRight, Download } from "lucide-react";
+import { Users, Copy, CheckCircle2, AlertTriangle, EyeOff, Eye, PauseCircle, PlayCircle, StopCircle, ArrowRight, ArrowLeft, Download } from "lucide-react";
 import { usePollStore, useHistoryStore, QnaItem, limitQnaItems, sanitizeQnaText } from "@/lib/store";
 import { usePeer } from "@/hooks/usePeer";
 import { encodeData, randomId } from "@/lib/utils";
-import PieChart from "@/app/components/PieChart";
+import BarResults, { usePalette } from "@/app/components/BarResults";
+import { Logo } from "@/app/components/Logo";
 import { motion, AnimatePresence } from "framer-motion";
 
 const FALLBACK_SYNC_INTERVAL_MS = 3000;
@@ -32,6 +33,7 @@ export default function HostDashboard() {
     } = usePollStore();
 
     const addPastPoll = useHistoryStore(state => state.addPastPoll);
+    const palette = usePalette();
 
     const [isMounted, setIsMounted] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -341,53 +343,54 @@ export default function HostDashboard() {
             <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-4 gap-8 z-10">
 
                 {/* Left Col: Info & QR */}
-                <div className="lg:col-span-1 space-y-6">
-                    <button
-                        onClick={() => {
-                            resetPoll();
-                            router.push('/');
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-secondary text-secondary-foreground hover:brightness-110 transition-all font-bold"
-                    >
-                        Exit Session
-                    </button>
+                <div className="lg:col-span-1 space-y-5">
+                    <div className="flex items-center justify-between px-1">
+                        <Logo size={24} />
+                        <button
+                            onClick={() => {
+                                resetPoll();
+                                router.push('/');
+                            }}
+                            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-foreground/60 transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> Exit
+                        </button>
+                    </div>
 
-                    <div className="glass rounded-2xl p-6 flex flex-col items-center text-center space-y-4">
-                        <h2 className="text-xl font-semibold">Join the Poll</h2>
-                        <div className="bg-white p-4 rounded-xl">
+                    <div className="glass rounded-3xl p-6 flex flex-col items-center text-center space-y-4">
+                        <h2 className="text-lg font-semibold tracking-tight">Scan to join</h2>
+                        <div className="bg-white p-4 rounded-2xl shadow-sm">
                             {joinUrl ? (
                                 <QRCodeSVG value={joinUrl} size={150} role="img" aria-label="QR code for joining the poll" title="QR code for joining the poll" />
                             ) : (
                                 <div className="w-[150px] h-[150px] bg-gray-100 animate-pulse rounded-xl" aria-hidden="true" />
                             )}
                         </div>
-                        <div className="w-full">
-                            <button
-                                onClick={handleCopy}
-                                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-background/50 border border-border hover:bg-white/5 transition-all text-sm font-medium"
-                            >
-                                {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
-                                {copied ? "Copied Link" : "Copy Join Link"}
-                            </button>
-                        </div>
+                        <button
+                            onClick={handleCopy}
+                            className="w-full flex items-center justify-center gap-2 rounded-full bg-secondary py-2.5 px-4 text-sm font-medium transition-all hover:brightness-110"
+                        >
+                            {copied ? <CheckCircle2 className="w-4 h-4 text-green-500" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
+                            {copied ? "Link copied" : "Copy join link"}
+                        </button>
                     </div>
 
                     {/* Connection Status */}
-                    <div className="glass rounded-2xl p-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="relative flex h-3 w-3">
-                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status === 'closed' ? 'bg-red-400' : 'bg-green-400'}`}></span>
-                                <span className={`relative inline-flex rounded-full h-3 w-3 ${status === 'closed' ? 'bg-red-500' : 'bg-green-500'}`}></span>
+                    <div className="glass rounded-3xl p-6">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex h-2.5 w-2.5">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status === 'closed' ? 'bg-red-400' : status === 'paused' ? 'bg-yellow-400' : 'bg-green-400'}`}></span>
+                                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${status === 'closed' ? 'bg-red-500' : status === 'paused' ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
                             </div>
-                            <span className="font-medium capitalize">{status} Connection</span>
+                            <span className="font-medium capitalize tracking-tight">{status === 'open' ? 'Live' : status}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-foreground/70 mt-4">
-                            <Users className="w-5 h-5" />
-                            <span>{connections.length} Attendee{connections.length !== 1 ? 's' : ''} Connected</span>
+                        <div className="mt-4 flex items-center gap-2 text-sm text-foreground/60">
+                            <Users className="w-4 h-4" aria-hidden="true" />
+                            <span>{connections.length} attendee{connections.length !== 1 ? 's' : ''} connected</span>
                         </div>
                         {!peerId && (
-                            <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" /> Initializing P2P...
+                            <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" aria-hidden="true" /> Initializing peer-to-peer…
                             </p>
                         )}
                     </div>
@@ -397,148 +400,163 @@ export default function HostDashboard() {
                 <div className="lg:col-span-3 space-y-6">
 
                     {/* Host Controls Panel */}
-                    <div className="glass rounded-2xl p-4 flex flex-wrap gap-4 items-center justify-between">
-                        <div className="flex gap-2">
+                    <div className="glass rounded-full px-3 py-2.5 flex flex-wrap gap-2 items-center justify-between">
+                        <div className="flex flex-wrap gap-1.5">
                             <button
                                 onClick={() => setResultsHidden(!resultsHidden)}
-                                className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${resultsHidden ? 'bg-indigo-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${resultsHidden ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:brightness-110'}`}
                             >
-                                {resultsHidden ? <><Eye className="w-4 h-4 mr-2" /> Show Results</> : <><EyeOff className="w-4 h-4 mr-2" /> Hide Results</>}
+                                {resultsHidden ? <><Eye className="w-4 h-4" aria-hidden="true" /> Show results</> : <><EyeOff className="w-4 h-4" aria-hidden="true" /> Hide results</>}
                             </button>
                             {status !== 'closed' && (
                                 <button
                                     onClick={handlePauseToggle}
-                                    className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${status === 'paused' ? 'bg-yellow-500 text-white' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${status === 'paused' ? 'bg-yellow-400 text-yellow-950' : 'bg-secondary text-secondary-foreground hover:brightness-110'}`}
                                 >
-                                    {status === 'paused' ? <><PlayCircle className="w-4 h-4 mr-2" /> Resume</> : <><PauseCircle className="w-4 h-4 mr-2" /> Pause</>}
+                                    {status === 'paused' ? <><PlayCircle className="w-4 h-4" aria-hidden="true" /> Resume</> : <><PauseCircle className="w-4 h-4" aria-hidden="true" /> Pause</>}
                                 </button>
                             )}
                             {status !== 'closed' && (
                                 <button
                                     onClick={handleClosePoll}
-                                    className="flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all border border-red-500/20"
+                                    className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium bg-red-500/10 text-red-500 transition-all hover:bg-red-500/20"
                                 >
-                                    <StopCircle className="w-4 h-4" /> Close Session
+                                    <StopCircle className="w-4 h-4" aria-hidden="true" /> Close
                                 </button>
                             )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                             <button
                                 onClick={exportCSV}
-                                className="flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all"
+                                className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium bg-secondary text-secondary-foreground transition-all hover:brightness-110"
                             >
-                                <Download className="w-4 h-4" /> CSV Export
+                                <Download className="w-4 h-4" aria-hidden="true" /> Export
                             </button>
 
                             {currentQuestionIndex < questions.length - 1 && (
                                 <button
                                     onClick={handleNextQuestion}
-                                    className="flex items-center gap-2 py-2 px-6 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
+                                    className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground shadow-md shadow-primary/25 transition-all hover:brightness-110"
                                 >
-                                    Next Q <ArrowRight className="w-4 h-4" />
+                                    Next question <ArrowRight className="w-4 h-4" aria-hidden="true" />
                                 </button>
                             )}
                         </div>
                     </div>
 
-                    <div className="glass rounded-2xl p-8 min-h-[500px] flex flex-col justify-center relative">
+                    <div className="glass rounded-3xl p-8 md:p-10 min-h-[500px] flex flex-col justify-center relative">
                         {status === 'closed' && (
-                            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center rounded-2xl">
-                                <StopCircle className="w-16 h-16 text-red-500 mb-4" />
-                                <h2 className="text-3xl font-bold">Session Closed</h2>
-                                <p className="text-foreground/70 mt-2">Final results are locked.</p>
+                            <div className="absolute inset-0 bg-background/80 backdrop-blur-md z-20 flex flex-col items-center justify-center rounded-3xl">
+                                <StopCircle className="w-14 h-14 text-red-500 mb-4" aria-hidden="true" />
+                                <h2 className="font-display text-3xl font-bold tracking-tight">Session closed</h2>
+                                <p className="text-foreground/60 mt-2">Final results are locked.</p>
                                 <button
                                     onClick={() => setStatus('open')}
                                     aria-label="Reopen the closed session"
-                                    className="mt-6 text-sm text-primary underline"
+                                    className="mt-6 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-md shadow-primary/25 transition-all hover:brightness-110"
                                 >
-                                    Reopen Session
+                                    Reopen session
                                 </button>
                             </div>
                         )}
 
                         <div className="mb-8">
-                            {questions.length > 1 && (
-                                <span className="text-sm font-bold text-primary mb-2 block tracking-wider uppercase">
-                                    Question {currentQuestionIndex + 1} of {questions.length}
-                                </span>
-                            )}
-                            <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">{question}</h1>
-                            <p className="text-lg text-foreground/60">{totalVotes} Total {pollType === 'qna' ? 'Questions' : 'Votes'}</p>
+                            <div className="mb-3 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider">
+                                <span className="text-primary">{pollType.replace('-', ' ')}</span>
+                                {questions.length > 1 && (
+                                    <span className="text-foreground/45">
+                                        Question {currentQuestionIndex + 1} of {questions.length}
+                                    </span>
+                                )}
+                            </div>
+                            <h1 className="font-display text-3xl md:text-5xl font-bold mb-3 leading-[1.08] tracking-tight">{question}</h1>
+                            <p className="text-lg text-foreground/55 tabular-nums">
+                                {totalVotes} {pollType === 'qna' ? (totalVotes === 1 ? 'question' : 'questions') : (totalVotes === 1 ? 'vote' : 'votes')}
+                            </p>
                         </div>
 
                         {resultsHidden ? (
-                            <div className="flex-1 border-2 border-dashed border-border/50 rounded-2xl flex flex-col items-center justify-center text-foreground/50">
-                                <EyeOff className="w-16 h-16 mb-4 opacity-50" />
-                                <h3 className="text-xl font-semibold">Results Hidden</h3>
-                                <p>Participants are voting...</p>
+                            <div className="flex-1 rounded-2xl bg-secondary/60 flex flex-col items-center justify-center py-20 text-foreground/50">
+                                <EyeOff className="w-14 h-14 mb-4 opacity-50" aria-hidden="true" />
+                                <h3 className="text-xl font-semibold tracking-tight">Results hidden</h3>
+                                <p className="mt-1 text-sm">Participants are voting…</p>
                             </div>
                         ) : (
                             <div className="flex-1 w-full flex items-center justify-center">
                                 {/* Type-specific visualizations */}
                                 {['multiple-choice', 'multiple-select'].includes(pollType) && (
-                                    <div className="w-full max-w-lg mx-auto">
-                                        <PieChart choices={choices} />
+                                    <div className="w-full max-w-3xl mx-auto">
+                                        <BarResults choices={choices} />
                                     </div>
                                 )}
 
                                 {pollType === 'ranked-choice' && (
-                                    <div className="space-y-4 w-full max-w-2xl mx-auto">
+                                    <div className="space-y-3 w-full max-w-2xl mx-auto">
                                         {[...choices].sort((a, b) => b.votes - a.votes).map((c, idx) => (
-                                            <div key={c.id} className="flex items-center gap-4 p-4 rounded-xl bg-background/50 border border-border">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-500/20 text-yellow-500' : idx === 1 ? 'bg-gray-400/20 text-gray-400' : idx === 2 ? 'bg-orange-700/20 text-orange-700' : 'bg-primary/10 text-primary'}`}>
-                                                    #{idx + 1}
+                                            <motion.div
+                                                key={c.id}
+                                                layout
+                                                transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                                                className={`flex items-center gap-4 rounded-2xl px-5 py-4 ${idx === 0 ? 'bg-secondary shadow-sm' : 'bg-secondary/60'}`}
+                                            >
+                                                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold tabular-nums ${idx === 0 ? 'bg-yellow-400/20 text-yellow-500' : idx === 1 ? 'bg-gray-400/20 text-gray-400' : idx === 2 ? 'bg-orange-600/20 text-orange-500' : 'bg-primary/10 text-primary'}`}>
+                                                    {idx + 1}
                                                 </div>
-                                                <div className="flex-1 font-semibold text-lg">{c.label}</div>
-                                                <div className="text-foreground/60 font-mono">{c.votes} pts</div>
-                                            </div>
+                                                <div className={`flex-1 text-lg md:text-xl font-semibold tracking-tight ${idx === 0 ? '' : 'text-foreground/75'}`}>{c.label}</div>
+                                                <div className="text-foreground/50 text-sm font-medium tabular-nums">{c.votes} pts</div>
+                                            </motion.div>
                                         ))}
                                     </div>
                                 )}
 
                                 {pollType === 'word-cloud' && (
-                                    <div className="flex flex-wrap justify-center items-center gap-4 w-full h-full p-8 content-center">
+                                    <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 w-full h-full p-4 md:p-8 content-center">
                                         {choices.length === 0 ? (
-                                            <p className="text-foreground/50">No responses yet...</p>
+                                            <p className="text-foreground/45 animate-pulse">Waiting for the first word…</p>
                                         ) : (
-                                            choices.map(c => {
-                                                // Calculate simple font size relative to max votes
+                                            (() => {
                                                 const maxVotes = Math.max(...choices.map(x => x.votes));
-                                                const size = Math.max(1, 1 + (c.votes / maxVotes) * 3);
-                                                return (
-                                                    <motion.span
-                                                        key={c.id}
-                                                        initial={{ opacity: 0, scale: 0 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
-                                                        style={{ fontSize: `${size}rem`, lineHeight: 1 }}
-                                                        className="font-bold text-primary m-2 drop-shadow-sm"
-                                                    >
-                                                        {c.label}
-                                                    </motion.span>
-                                                )
-                                            })
+                                                return choices.map((c, i) => {
+                                                    const weight = maxVotes === 0 ? 0 : c.votes / maxVotes;
+                                                    const size = 1.25 + weight * 3.75; // 1.25rem → 5rem
+                                                    return (
+                                                        <motion.span
+                                                            key={c.id}
+                                                            layout
+                                                            initial={{ opacity: 0, scale: 0.3 }}
+                                                            animate={{ opacity: 0.55 + weight * 0.45, scale: 1 }}
+                                                            transition={{ type: "spring", stiffness: 240, damping: 20 }}
+                                                            style={{ fontSize: `${size}rem`, lineHeight: 1.1, color: palette[i % palette.length] }}
+                                                            className="font-display font-bold tracking-tight"
+                                                        >
+                                                            {c.label}
+                                                        </motion.span>
+                                                    );
+                                                });
+                                            })()
                                         )}
                                     </div>
                                 )}
 
                                 {pollType === 'qna' && (
-                                    <div className="w-full h-[500px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                                    <div className="w-full h-[500px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                                         {qnaItems.length === 0 ? (
-                                            <p className="text-center text-foreground/50 py-12">No questions asked yet...</p>
+                                            <p className="text-center text-foreground/45 py-12 animate-pulse">Waiting for the first question…</p>
                                         ) : (
-                                            [...qnaItems].sort((a, b) => b.upvotes - a.upvotes).map(item => (
+                                            [...qnaItems].sort((a, b) => b.upvotes - a.upvotes).map((item, idx) => (
                                                 <motion.div
                                                     key={item.id}
                                                     layout
-                                                    initial={{ opacity: 0, y: 20 }}
+                                                    initial={{ opacity: 0, y: 16 }}
                                                     animate={{ opacity: 1, y: 0 }}
-                                                    className="p-6 rounded-2xl bg-background/50 border border-border flex gap-4"
+                                                    transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                                                    className={`flex items-center gap-4 rounded-2xl px-5 py-4 ${idx === 0 && item.upvotes > 0 ? 'bg-secondary shadow-sm' : 'bg-secondary/60'}`}
                                                 >
-                                                    <div className="flex flex-col items-center justify-start gap-1">
-                                                        <span className="text-foreground/40" aria-hidden="true">▲</span>
-                                                        <span className="font-bold text-lg">{item.upvotes}</span>
+                                                    <div className={`flex flex-col items-center justify-center rounded-xl px-3 py-1.5 min-w-[3rem] ${item.upvotes > 0 ? 'bg-primary/10 text-primary' : 'bg-secondary text-foreground/40'}`}>
+                                                        <span className="text-[0.6rem] font-semibold uppercase tracking-wide" aria-hidden="true">▲</span>
+                                                        <span className="text-lg font-bold tabular-nums leading-tight">{item.upvotes}</span>
                                                     </div>
-                                                    <div className="flex-1 text-lg pt-1">
+                                                    <div className="flex-1 text-base md:text-lg leading-snug">
                                                         {item.text}
                                                     </div>
                                                 </motion.div>

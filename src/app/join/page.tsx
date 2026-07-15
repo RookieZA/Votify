@@ -5,9 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { decodeData, getOrCreateVoterId } from "@/lib/utils";
 import { usePeerConnection } from "@/hooks/usePeerConnection";
-import { usePollStore, PollType } from "@/lib/store";
+import { PollType } from "@/lib/store";
 import { CheckCircle2, AlertTriangle, Loader2, Send, Lock, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Logo } from "@/app/components/Logo";
 
 const POLL_TYPES = ['multiple-choice', 'multiple-select', 'word-cloud', 'ranked-choice', 'qna'] as const;
 
@@ -73,8 +74,6 @@ function JoinScreen() {
             isSubmittingRef.current = false;
         }
     });
-
-    const addVote = usePollStore((state) => state.addVote);
 
     useEffect(() => {
         setIsMounted(true);
@@ -181,14 +180,15 @@ function JoinScreen() {
                 throw new Error("Failed to submit response");
             }
 
+            // Note: the participant deliberately does NOT write to the poll store.
+            // The store is the host's source of truth; writing here would corrupt
+            // counts when host and participant share a browser (same localStorage).
             if (poll.t === 'qna') {
                 setTextInput("");
             } else if (poll.t === 'word-cloud') {
-                addVote(payloadContent, voterId);
                 setTextInput("");
                 setWordSubmitted(true);
             } else {
-                addVote(payloadContent, voterId);
                 setVoted(true);
             }
         } catch (submitError) {
@@ -223,17 +223,20 @@ function JoinScreen() {
 
     return (
         <main className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center pb-24">
-            <div className="w-full max-w-lg glass rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-700">
+            <div className="mb-5 animate-in fade-in duration-700">
+                <Logo size={22} />
+            </div>
+            <div className="w-full max-w-lg glass rounded-3xl overflow-hidden animate-in slide-in-from-bottom-8 duration-700">
 
                 {/* Header */}
-                <div className="p-6 border-b border-border bg-background/20 relative">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary mb-2 block">
+                <div className="p-6 border-b border-border relative">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary mb-2 block">
                         {poll.t.replace('-', ' ')}
                     </span>
-                    <h1 className="text-2xl font-bold pr-16">{poll.q}</h1>
+                    <h1 className="font-display text-2xl font-bold tracking-tight leading-snug pr-16">{poll.q}</h1>
                     <div className="absolute top-6 right-6 flex flex-col items-end" aria-live="polite">
                         <StatusIcon status={status} />
-                        <span className="mt-2 text-xs text-foreground/70">{getConnectionStatusText(status)}</span>
+                        <span className="mt-2 text-xs text-foreground/60">{getConnectionStatusText(status)}</span>
                     </div>
                 </div>
 
@@ -241,15 +244,15 @@ function JoinScreen() {
                 <div className="p-6">
                     {hostStatus === 'closed' ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <Lock className="w-12 h-12 text-red-500 mb-4" />
-                            <h2 className="text-2xl font-bold mb-2">Poll Closed</h2>
-                            <p className="text-foreground/70">The host has closed this session.</p>
+                            <Lock className="w-12 h-12 text-red-500 mb-4" aria-hidden="true" />
+                            <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Session closed</h2>
+                            <p className="text-foreground/60">The host has closed this session.</p>
                         </div>
                     ) : hostStatus === 'paused' ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <Pause className="w-12 h-12 text-yellow-500 mb-4" />
-                            <h2 className="text-2xl font-bold mb-2">Poll Paused</h2>
-                            <p className="text-foreground/70">Wait for the host to resume voting.</p>
+                            <Pause className="w-12 h-12 text-yellow-500 mb-4" aria-hidden="true" />
+                            <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Hang tight</h2>
+                            <p className="text-foreground/60">The host has paused voting for a moment.</p>
                         </div>
                     ) : (
                         <AnimatePresence mode="wait">
@@ -266,14 +269,14 @@ function JoinScreen() {
                                             key={choice.i}
                                             onClick={() => setSelectedId(choice.i)}
                                             aria-pressed={selectedId === choice.i}
-                                            className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition-all ${selectedId === choice.i
-                                                ? "border-primary bg-primary/20 scale-[1.02]"
-                                                : "border-border hover:bg-white/5"
+                                            className={`w-full px-5 py-4 rounded-2xl text-left flex justify-between items-center transition-all ${selectedId === choice.i
+                                                ? "bg-primary/10 ring-2 ring-primary"
+                                                : "bg-secondary hover:brightness-105 active:scale-[0.99]"
                                                 }`}
                                         >
-                                            <span className="font-medium text-lg">{choice.l}</span>
+                                            <span className="font-medium text-[17px]">{choice.l}</span>
                                             {selectedId === choice.i && (
-                                                <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" />
+                                                <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" aria-hidden="true" />
                                             )}
                                         </button>
                                     ))}
@@ -286,21 +289,21 @@ function JoinScreen() {
                                                 else setSelectedIds([...selectedIds, choice.i]);
                                             }}
                                             aria-pressed={selectedIds.includes(choice.i)}
-                                            className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition-all ${selectedIds.includes(choice.i)
-                                                ? "border-primary bg-primary/20 scale-[1.02]"
-                                                : "border-border hover:bg-white/5"
+                                            className={`w-full px-5 py-4 rounded-2xl text-left flex justify-between items-center transition-all ${selectedIds.includes(choice.i)
+                                                ? "bg-primary/10 ring-2 ring-primary"
+                                                : "bg-secondary hover:brightness-105 active:scale-[0.99]"
                                                 }`}
                                         >
-                                            <span className="font-medium text-lg">{choice.l}</span>
+                                            <span className="font-medium text-[17px]">{choice.l}</span>
                                             {selectedIds.includes(choice.i) && (
-                                                <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" />
+                                                <CheckCircle2 className="w-5 h-5 text-primary animate-in zoom-in" aria-hidden="true" />
                                             )}
                                         </button>
                                     ))}
 
                                     {poll.t === 'ranked-choice' && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-foreground/70 mb-4">Click options in order of preference.</p>
+                                        <div className="space-y-2.5">
+                                            <p className="text-sm text-foreground/60 mb-4">Tap options in order of preference.</p>
                                             {poll.c.map((choice) => {
                                                 const rank = selectedIds.indexOf(choice.i) + 1;
                                                 const isSelected = rank > 0;
@@ -310,15 +313,15 @@ function JoinScreen() {
                                                         onClick={() => handleSelectRanked(choice.i)}
                                                         aria-pressed={isSelected}
                                                         aria-label={isSelected ? `${choice.l}, rank ${rank}` : `Select ${choice.l}`}
-                                                        className={`w-full p-4 rounded-xl border text-left flex items-center transition-all gap-4 ${isSelected
-                                                            ? "border-primary bg-primary/20 scale-[1.02]"
-                                                            : "border-border hover:bg-white/5"
+                                                        className={`w-full px-5 py-4 rounded-2xl text-left flex items-center transition-all gap-4 ${isSelected
+                                                            ? "bg-primary/10 ring-2 ring-primary"
+                                                            : "bg-secondary hover:brightness-105 active:scale-[0.99]"
                                                             }`}
                                                     >
-                                                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold transition-all ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent'}`}>
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm tabular-nums transition-all ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-background/60 text-transparent'}`}>
                                                             {isSelected ? rank : ''}
                                                         </div>
-                                                        <span className="font-medium text-lg">{choice.l}</span>
+                                                        <span className="font-medium text-[17px]">{choice.l}</span>
                                                     </button>
                                                 )
                                             })}
@@ -326,29 +329,29 @@ function JoinScreen() {
                                     )}
 
                                     {['word-cloud', 'qna'].includes(poll.t) && (
-                                        <div className="space-y-2">
+                                        <div className="space-y-2.5">
                                             <label htmlFor="participant-response" className="sr-only">
                                                 {poll.t === 'qna' ? 'Ask a question' : 'Enter a short word or phrase'}
                                             </label>
                                             <textarea
                                                 id="participant-response"
                                                 rows={3}
-                                                placeholder={poll.t === 'qna' ? "Ask a question..." : "Enter a short word or phrase..."}
-                                                className="w-full p-4 rounded-xl bg-background/50 border border-border focus:outline-none focus:ring-2 focus:ring-primary backdrop-blur-md transition-all text-lg resize-none"
+                                                placeholder={poll.t === 'qna' ? "Ask a question…" : "Type a short word or phrase…"}
+                                                className="w-full px-5 py-4 rounded-2xl bg-secondary border border-transparent focus:outline-none focus:ring-2 focus:ring-primary/60 focus:bg-background transition-all text-[17px] resize-none placeholder:text-foreground/35"
                                                 value={textInput}
                                                 onChange={(e) => setTextInput(e.target.value)}
                                             />
                                             {poll.t === 'word-cloud' && wordSubmitted && (
-                                                <p className="flex items-center gap-2 rounded-xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-400" aria-live="polite">
-                                                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                                    Response added! You can submit another.
+                                                <p className="flex items-center gap-2 rounded-2xl bg-green-500/10 px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400" aria-live="polite">
+                                                    <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                                                    Added! Feel free to send another.
                                                 </p>
                                             )}
                                         </div>
                                     )}
 
                                     {submissionError && (
-                                        <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                        <p className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
                                             {submissionError}
                                         </p>
                                     )}
@@ -356,15 +359,15 @@ function JoinScreen() {
                                     <button
                                         onClick={handleVote}
                                         disabled={isSubmitDisabled}
-                                        className="w-full mt-6 py-4 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full mt-6 py-4 rounded-full bg-primary text-primary-foreground text-[17px] font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                                     >
                                         {isSubmitting ? (
                                             <>
-                                                Submitting... <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                                                Submitting… <Loader2 className="w-4 h-4 ml-1 animate-spin" aria-hidden="true" />
                                             </>
                                         ) : (
                                             <>
-                                                Submi{poll.t === 'qna' ? 't Question' : 't Vote'} <Send className="w-4 h-4 ml-2" />
+                                                {poll.t === 'qna' ? 'Send question' : poll.t === 'word-cloud' ? 'Send response' : 'Submit vote'} <Send className="w-4 h-4 ml-1" aria-hidden="true" />
                                             </>
                                         )}
                                     </button>
@@ -376,11 +379,11 @@ function JoinScreen() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="flex flex-col items-center justify-center py-12 text-center"
                                 >
-                                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
-                                        <CheckCircle2 className="w-10 h-10 text-green-500" />
+                                    <div className="w-20 h-20 bg-green-500/15 rounded-full flex items-center justify-center mb-6">
+                                        <CheckCircle2 className="w-10 h-10 text-green-500" aria-hidden="true" />
                                     </div>
-                                    <h2 className="text-2xl font-bold mb-2">Vote Submitted!</h2>
-                                    <p className="text-foreground/70">Wait for the Host to advance to the next question.</p>
+                                    <h2 className="font-display text-2xl font-bold tracking-tight mb-2">You&apos;re in!</h2>
+                                    <p className="text-foreground/60">Vote received — watch the big screen for results.</p>
                                 </motion.div>
                             )}
                         </AnimatePresence>

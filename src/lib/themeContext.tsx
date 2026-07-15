@@ -15,22 +15,22 @@ export const THEMES: ThemeDefinition[] = [
   {
     id: "light",
     label: "Light",
-    swatches: ["#6366f1", "#a855f7"],
+    swatches: ["#f5f5f7", "#0071e3"],
   },
   {
     id: "midnight",
     label: "Midnight",
-    swatches: ["#3b82f6", "#8b5cf6"],
+    swatches: ["#1c1c1e", "#2997ff"],
   },
   {
     id: "vivid",
-    label: "Vivid",
-    swatches: ["#f26419", "#7c3aed"],
+    label: "Graphite",
+    swatches: ["#2c2c2e", "#ff9f0a"],
   },
   {
     id: "ocean",
     label: "Ocean",
-    swatches: ["#06b6d4", "#10b981"],
+    swatches: ["#142a32", "#30b0c7"],
   },
 ];
 
