@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export function encodeData(data: any): string {
+export function encodeData<T extends Record<string, unknown> | string | number | boolean>(data: T): string {
     try {
         return btoa(encodeURIComponent(JSON.stringify(data)));
     } catch (error) {
@@ -47,9 +47,28 @@ export function getOrCreateVoterId(): string {
 
     let voterId = localStorage.getItem("votify_voter_id");
     if (!voterId) {
-        // Generate a random ID. Not cryptographically perfect, but good enough for this context
-        voterId = `voter_${Math.random().toString(36).substring(2, 15)}_${Date.now().toString(36)}`;
+        voterId = `voter_${generateSecureId()}`;
         localStorage.setItem("votify_voter_id", voterId);
     }
     return voterId;
+}
+
+function generateSecureId(): string {
+    if (typeof window === "undefined") {
+        return "server";
+    }
+
+    const cryptoApi = window.crypto;
+    if (cryptoApi?.randomUUID) {
+        return cryptoApi.randomUUID();
+    }
+
+    if (cryptoApi?.getRandomValues) {
+        const randomBytes = new Uint8Array(16);
+        cryptoApi.getRandomValues(randomBytes);
+        return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    // Legacy fallback when Web Crypto is unavailable.
+    return `${Date.now().toString(36)}_${performance.now().toString(36).replace(".", "")}`;
 }

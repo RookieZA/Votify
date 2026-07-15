@@ -4,11 +4,16 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { DataConnection, Peer } from "peerjs";
 import { PeerPayload } from "./usePeer";
 
-export function usePeerConnection(hostId: string, onMessage?: (data: any) => void) {
+export function usePeerConnection(hostId: string, onMessage?: (data: unknown) => void) {
     const [status, setStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
     const connInstance = useRef<DataConnection | null>(null);
     const peerInstance = useRef<Peer | null>(null);
     const isConnectedRef = useRef(false);
+    const onMessageRef = useRef(onMessage);
+
+    useEffect(() => {
+        onMessageRef.current = onMessage;
+    }, [onMessage]);
 
     useEffect(() => {
         if (!hostId || typeof window === "undefined") return;
@@ -37,7 +42,7 @@ export function usePeerConnection(hostId: string, onMessage?: (data: any) => voi
                         });
 
                         conn.on("data", (data) => {
-                            if (onMessage) onMessage(data);
+                            onMessageRef.current?.(data);
                         });
 
                         // Fallback: poll conn.open every 100ms.
@@ -73,22 +78,38 @@ export function usePeerConnection(hostId: string, onMessage?: (data: any) => voi
                     } catch (err) {
                         console.error("Failed to connect to host:", err);
                         setStatus("error");
+                        if (pollInterval) {
+                            clearInterval(pollInterval);
+                            pollInterval = null;
+                        }
                     }
                 });
 
                 peer.on("error", (err) => {
                     console.error("Peer error:", err);
                     setStatus("error");
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
                 });
 
                 peerInstance.current = peer;
             } catch (err) {
                 console.error("Failed to initialize Peer:", err);
                 setStatus("error");
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
             }
         }).catch(err => {
             console.error("Failed to load peerjs module:", err);
             setStatus("error");
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
         });
 
         return () => {

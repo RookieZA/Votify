@@ -4,6 +4,9 @@ import { randomId } from './utils';
 
 export type PollType = 'multiple-choice' | 'multiple-select' | 'word-cloud' | 'ranked-choice' | 'qna';
 
+export const MAX_QNA_ITEMS = 500;
+export const MAX_QNA_TEXT_LENGTH = 500;
+
 export interface Choice {
     id: string;
     label: string;
@@ -16,6 +19,18 @@ export interface QnaItem {
     upvotes: number;
     userId: string;
     upvoterIds: string[];
+}
+
+export function sanitizeQnaText(text: string): string {
+    return text.trim().slice(0, MAX_QNA_TEXT_LENGTH);
+}
+
+export function limitQnaItems(items: QnaItem[]): QnaItem[] {
+    if (items.length <= MAX_QNA_ITEMS) {
+        return items;
+    }
+
+    return items.slice(-MAX_QNA_ITEMS);
 }
 
 export interface QuestionData {
@@ -42,7 +57,7 @@ export interface PollState {
 
     // Actions
     setPoll: (hostId: string, pollType: PollType, questions: QuestionData[]) => void;
-    addVote: (payload: any, voterId?: string) => void;
+    addVote: (payload: string | string[], voterId?: string) => void;
     addQnaItem: (text: string, userId: string) => void;
     upvoteQnaItem: (id: string, userId: string) => void;
     setStatus: (status: 'open' | 'paused' | 'closed') => void;
@@ -84,11 +99,11 @@ export const usePollStore = create<PollState>()(
                 });
             },
 
-            addVote: (payload: any, voterId?: string) => {
+            addVote: (payload: string | string[], voterId?: string) => {
                 const state = get();
 
-                // If a voterId is provided and they already voted on this question (except for QnA where they can ask multiple)
-                if (voterId && state.votedUsers.includes(voterId) && state.pollType !== 'qna') {
+                // If a voterId is provided and they already voted on this question (except for QnA and word clouds where they can submit multiple)
+                if (voterId && state.votedUsers.includes(voterId) && state.pollType !== 'qna' && state.pollType !== 'word-cloud') {
                     // For multiple-select, maybe array payload is sent at once, so it's fine.
                     return;
                 }
@@ -143,14 +158,20 @@ export const usePollStore = create<PollState>()(
 
             addQnaItem: (text: string, userId: string) => {
                 const state = get();
+                const sanitizedText = sanitizeQnaText(text);
+                if (!sanitizedText) {
+                    return;
+                }
+
                 const newItem: QnaItem = {
                     id: randomId(),
-                    text,
+                    text: sanitizedText,
                     upvotes: 0,
                     userId,
                     upvoterIds: []
                 };
-                set({ qnaItems: [...state.qnaItems, newItem] });
+
+                set({ qnaItems: limitQnaItems([...state.qnaItems, newItem]) });
             },
 
             upvoteQnaItem: (id: string, userId: string) => {

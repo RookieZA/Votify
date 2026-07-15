@@ -25,11 +25,14 @@ interface QnaItem {
     upvoterIds: string[];
 }
 
-const globalAny = global as any;
-if (!globalAny.qnaStore) {
-    globalAny.qnaStore = new Map<string, QnaItem[]>();
+type QnaGlobalStore = typeof globalThis & {
+    qnaStore?: Map<string, QnaItem[]>;
+};
+const qnaGlobalStore = globalThis as QnaGlobalStore;
+if (!qnaGlobalStore.qnaStore) {
+    qnaGlobalStore.qnaStore = new Map<string, QnaItem[]>();
 }
-const store: Map<string, QnaItem[]> = globalAny.qnaStore;
+const store: Map<string, QnaItem[]> = qnaGlobalStore.qnaStore;
 
 const MAX_REQUESTS_PER_WINDOW = 30; // 30 posts per minute per IP
 const MAX_POLLS = 10_000;
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
         }
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 }

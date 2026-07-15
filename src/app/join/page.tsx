@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { decodeData, getOrCreateVoterId } from "@/lib/utils";
@@ -46,9 +46,13 @@ function JoinScreen() {
     const [hostStatus, setHostStatus] = useState<'open' | 'paused' | 'closed'>('open');
 
     const [voted, setVoted] = useState(false);
+    const [wordSubmitted, setWordSubmitted] = useState(false);
     const [error, setError] = useState("");
+    const [submissionError, setSubmissionError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const [localEmojis, setLocalEmojis] = useState<{ id: string; emoji: string; x: number }[]>([]);
+    const isSubmittingRef = useRef(false);
 
     const { status, sendMessage } = usePeerConnection(peerId || "", (data: unknown) => {
         const parsed = stateChangeSchema.safeParse(data);
@@ -59,10 +63,14 @@ function JoinScreen() {
             // The Host advanced the poll
             setPoll({ t: 'multiple-choice', ...msg.data } as JoinQuestion);
             setVoted(false);
+            setWordSubmitted(false);
             setSelectedId(null);
             setSelectedIds([]);
             setTextInput("");
             setHostStatus('open');
+            setSubmissionError("");
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     });
 
@@ -98,9 +106,9 @@ function JoinScreen() {
     }
 
     const handleVote = async () => {
-        if (voted || hostStatus !== 'open') return;
+        if (voted || hostStatus !== 'open' || isSubmittingRef.current) return;
 
-        let payloadContent: any;
+        let payloadContent: string | string[] | null = null;
         if (poll.t === 'multiple-choice') {
             if (!selectedId) return;
             payloadContent = selectedId;
@@ -116,30 +124,32 @@ function JoinScreen() {
             payloadContent = textInput.trim();
         }
 
+        if (payloadContent === null) {
+            return;
+        }
+
         const voterId = getOrCreateVoterId();
+        setSubmissionError("");
+        setIsSubmitting(true);
+        isSubmittingRef.current = true;
 
-        if (poll.t === 'qna') {
-            sendMessage({ type: "QNA_POST", text: payloadContent, voterId });
+        const sendFallback = async (): Promise<boolean> => {
+            if (poll.t === 'qna') {
+                const response = await fetch('/api/qna', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        hostId: peerId,
+                        text: payloadContent,
+                        voterId,
+                        action: 'post'
+                    })
+                });
 
-            // HTTP Fallback
-            fetch('/api/qna', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    hostId: peerId,
-                    text: payloadContent,
-                    voterId,
-                    action: 'post'
-                })
-            }).catch(() => { });
+                return response.ok;
+            }
 
-            // Let them ask multiple Qs
-            setTextInput("");
-        } else {
-            sendMessage({ type: "VOTE", choiceId: payloadContent, voterId });
-
-            // HTTP Fallback
-            fetch('/api/vote', {
+            const response = await fetch('/api/vote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -148,11 +158,45 @@ function JoinScreen() {
                     voterId,
                     pollType: poll.t
                 })
-            }).catch(() => { });
+            });
 
-            // Fallback for same browser localstorage
-            addVote(payloadContent, voterId);
-            setVoted(true);
+            return response.ok || response.status === 409;
+        };
+
+        try {
+            const peerDelivered = poll.t === 'qna'
+                ? sendMessage({ type: "QNA_POST", text: payloadContent as string, voterId })
+                : sendMessage({ type: "VOTE", choiceId: payloadContent, voterId });
+
+            let fallbackDelivered = false;
+            try {
+                fallbackDelivered = await sendFallback();
+            } catch (fallbackError) {
+                if (!peerDelivered) {
+                    throw fallbackError;
+                }
+            }
+
+            if (!peerDelivered && !fallbackDelivered) {
+                throw new Error("Failed to submit response");
+            }
+
+            if (poll.t === 'qna') {
+                setTextInput("");
+            } else if (poll.t === 'word-cloud') {
+                addVote(payloadContent, voterId);
+                setTextInput("");
+                setWordSubmitted(true);
+            } else {
+                addVote(payloadContent, voterId);
+                setVoted(true);
+            }
+        } catch (submitError) {
+            console.error("Failed to submit response:", submitError);
+            setSubmissionError("Failed to submit. Check your connection and try again.");
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -171,7 +215,7 @@ function JoinScreen() {
         setTimeout(() => setLocalEmojis(prev => prev.filter(e => e.id !== id)), 3000);
     }
 
-    const isSubmitDisabled = voted || hostStatus !== 'open' ||
+    const isSubmitDisabled = voted || hostStatus !== 'open' || isSubmitting ||
         (poll.t === 'multiple-choice' && !selectedId) ||
         (poll.t === 'multiple-select' && selectedIds.length === 0) ||
         (poll.t === 'ranked-choice' && selectedIds.length !== poll.c.length) ||
@@ -187,8 +231,9 @@ function JoinScreen() {
                         {poll.t.replace('-', ' ')}
                     </span>
                     <h1 className="text-2xl font-bold pr-16">{poll.q}</h1>
-                    <div className="absolute top-6 right-6 flex flex-col items-end">
+                    <div className="absolute top-6 right-6 flex flex-col items-end" aria-live="polite">
                         <StatusIcon status={status} />
+                        <span className="mt-2 text-xs text-foreground/70">{getConnectionStatusText(status)}</span>
                     </div>
                 </div>
 
@@ -220,6 +265,7 @@ function JoinScreen() {
                                         <button
                                             key={choice.i}
                                             onClick={() => setSelectedId(choice.i)}
+                                            aria-pressed={selectedId === choice.i}
                                             className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition-all ${selectedId === choice.i
                                                 ? "border-primary bg-primary/20 scale-[1.02]"
                                                 : "border-border hover:bg-white/5"
@@ -239,6 +285,7 @@ function JoinScreen() {
                                                 if (selectedIds.includes(choice.i)) setSelectedIds(selectedIds.filter(id => id !== choice.i));
                                                 else setSelectedIds([...selectedIds, choice.i]);
                                             }}
+                                            aria-pressed={selectedIds.includes(choice.i)}
                                             className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition-all ${selectedIds.includes(choice.i)
                                                 ? "border-primary bg-primary/20 scale-[1.02]"
                                                 : "border-border hover:bg-white/5"
@@ -261,6 +308,8 @@ function JoinScreen() {
                                                     <button
                                                         key={choice.i}
                                                         onClick={() => handleSelectRanked(choice.i)}
+                                                        aria-pressed={isSelected}
+                                                        aria-label={isSelected ? `${choice.l}, rank ${rank}` : `Select ${choice.l}`}
                                                         className={`w-full p-4 rounded-xl border text-left flex items-center transition-all gap-4 ${isSelected
                                                             ? "border-primary bg-primary/20 scale-[1.02]"
                                                             : "border-border hover:bg-white/5"
@@ -278,14 +327,30 @@ function JoinScreen() {
 
                                     {['word-cloud', 'qna'].includes(poll.t) && (
                                         <div className="space-y-2">
+                                            <label htmlFor="participant-response" className="sr-only">
+                                                {poll.t === 'qna' ? 'Ask a question' : 'Enter a short word or phrase'}
+                                            </label>
                                             <textarea
+                                                id="participant-response"
                                                 rows={3}
                                                 placeholder={poll.t === 'qna' ? "Ask a question..." : "Enter a short word or phrase..."}
                                                 className="w-full p-4 rounded-xl bg-background/50 border border-border focus:outline-none focus:ring-2 focus:ring-primary backdrop-blur-md transition-all text-lg resize-none"
                                                 value={textInput}
                                                 onChange={(e) => setTextInput(e.target.value)}
                                             />
+                                            {poll.t === 'word-cloud' && wordSubmitted && (
+                                                <p className="flex items-center gap-2 rounded-xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-400" aria-live="polite">
+                                                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                                    Response added! You can submit another.
+                                                </p>
+                                            )}
                                         </div>
+                                    )}
+
+                                    {submissionError && (
+                                        <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                            {submissionError}
+                                        </p>
                                     )}
 
                                     <button
@@ -293,7 +358,15 @@ function JoinScreen() {
                                         disabled={isSubmitDisabled}
                                         className="w-full mt-6 py-4 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        Submi{poll.t === 'qna' ? 't Question' : 't Vote'} <Send className="w-4 h-4 ml-2" />
+                                        {isSubmitting ? (
+                                            <>
+                                                Submitting... <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                Submi{poll.t === 'qna' ? 't Question' : 't Vote'} <Send className="w-4 h-4 ml-2" />
+                                            </>
+                                        )}
                                     </button>
                                 </motion.div>
                             ) : (
@@ -341,6 +414,7 @@ function JoinScreen() {
                         <button
                             key={emoji}
                             onClick={() => sendEmoji(emoji)}
+                            aria-label={`Send ${emoji} reaction`}
                             className="text-2xl hover:scale-125 transition-transform active:scale-95"
                         >
                             {emoji}
@@ -361,6 +435,13 @@ function StatusIcon({ status }: { status: string }) {
         </span>;
     }
     return <AlertTriangle className="w-5 h-5 text-red-500" />;
+}
+
+function getConnectionStatusText(status: string): string {
+    if (status === "connecting") return "Connecting";
+    if (status === "connected") return "Connected";
+    if (status === "disconnected") return "Disconnected";
+    return "Connection error";
 }
 
 function ErrorState({ message }: { message: string }) {

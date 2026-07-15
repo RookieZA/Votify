@@ -3,12 +3,22 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Users, Copy, CheckCircle2, AlertTriangle, EyeOff, Eye, PauseCircle, PlayCircle, StopCircle, ArrowRight, Download, Heart } from "lucide-react";
-import { usePollStore, useHistoryStore } from "@/lib/store";
+import { Users, Copy, CheckCircle2, AlertTriangle, EyeOff, Eye, PauseCircle, PlayCircle, StopCircle, ArrowRight, Download } from "lucide-react";
+import { usePollStore, useHistoryStore, QnaItem, limitQnaItems, sanitizeQnaText } from "@/lib/store";
 import { usePeer } from "@/hooks/usePeer";
 import { encodeData, randomId } from "@/lib/utils";
 import PieChart from "@/app/components/PieChart";
 import { motion, AnimatePresence } from "framer-motion";
+
+const FALLBACK_SYNC_INTERVAL_MS = 3000;
+
+interface VoteSyncResponse {
+    votes?: Record<string, number>;
+}
+
+interface QnaSyncResponse {
+    qnaItems?: QnaItem[];
+}
 
 export default function HostDashboard() {
     const params = useParams();
@@ -17,7 +27,7 @@ export default function HostDashboard() {
 
     const {
         hostId: storedHostId, pollType, status, resultsHidden, questions, currentQuestionIndex,
-        question, choices, qnaItems, votedUsers,
+        question, choices, qnaItems,
         addVote, addQnaItem, upvoteQnaItem, setStatus, setResultsHidden, nextQuestion, resetPoll
     } = usePollStore();
 
@@ -27,6 +37,7 @@ export default function HostDashboard() {
     const [copied, setCopied] = useState(false);
     const [origin, setOrigin] = useState("");
     const [emojis, setEmojis] = useState<{ id: string, emoji: string, x: number }[]>([]);
+    const fallbackSyncInFlightRef = useRef(false);
 
     useEffect(() => {
         setOrigin(window.location.origin);
@@ -48,91 +59,128 @@ export default function HostDashboard() {
         }
     }, [isMounted, storedHostId, hostId, router]);
 
-    // Fallback sync logic, simplified
-    useEffect(() => {
-        if (!isMounted || storedHostId !== hostId) return;
+    const syncFallbackState = useCallback(async (signal: AbortSignal) => {
+        if (fallbackSyncInFlightRef.current) return;
 
-        const syncVotes = async () => {
-            try {
-                const currentPollType = usePollStore.getState().pollType;
-                if (currentPollType === 'qna') {
-                    const res = await fetch(`/api/qna?hostId=${hostId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.qnaItems) {
-                            const currentQna = usePollStore.getState().qnaItems;
-                            let updated = false;
-                            const newQna = [...currentQna];
+        fallbackSyncInFlightRef.current = true;
+        try {
+            const currentPollType = usePollStore.getState().pollType;
+            if (currentPollType === 'qna') {
+                const res = await fetch(`/api/qna?hostId=${hostId}`, { cache: "no-store", signal });
+                if (!res.ok) return;
 
-                            data.qnaItems.forEach((apiItem: any) => {
-                                const existing = newQna.find((item: any) => item.text === apiItem.text && item.userId === apiItem.userId);
-                                if (!existing) {
-                                    newQna.push({
-                                        id: apiItem.id,
-                                        text: apiItem.text,
-                                        upvotes: apiItem.upvotes,
-                                        userId: apiItem.userId,
-                                        upvoterIds: apiItem.upvoterIds || []
-                                    });
-                                    updated = true;
-                                } else if (apiItem.upvotes > existing.upvotes) {
-                                    existing.upvotes = apiItem.upvotes;
-                                    existing.upvoterIds = apiItem.upvoterIds || [];
-                                    updated = true;
-                                }
-                            });
+                const data: QnaSyncResponse = await res.json();
+                if (!data.qnaItems?.length) return;
 
-                            if (updated) {
-                                usePollStore.setState({ qnaItems: newQna });
-                            }
-                        }
+                const currentQna = usePollStore.getState().qnaItems;
+                let updated = false;
+                const newQna = [...currentQna];
+
+                data.qnaItems.forEach((apiItem) => {
+                    const sanitizedText = sanitizeQnaText(apiItem.text);
+                    if (!sanitizedText) {
+                        return;
                     }
-                } else {
-                    const res = await fetch(`/api/vote?hostId=${hostId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.votes) {
-                            const currentChoices = usePollStore.getState().choices;
-                            let updated = false;
-                            const newChoices = [...currentChoices];
 
-                            Object.entries(data.votes).forEach(([key, apiVotes]: [string, any]) => {
-                                const currentPollType = usePollStore.getState().pollType;
-                                if (currentPollType === 'word-cloud') {
-                                    const lowerKey = key.toLowerCase();
-                                    const existing = newChoices.find(c => c.label.toLowerCase() === lowerKey);
-                                    if (existing) {
-                                        if (apiVotes > existing.votes) {
-                                            existing.votes = apiVotes;
-                                            updated = true;
-                                        }
-                                    } else {
-                                        newChoices.push({ id: randomId(), label: key, votes: apiVotes });
-                                        updated = true;
-                                    }
-                                } else {
-                                    const existing = newChoices.find(c => c.id === key);
-                                    if (existing && apiVotes > existing.votes) {
-                                        existing.votes = apiVotes;
-                                        updated = true;
-                                    }
-                                }
-                            });
-
-                            if (updated) {
-                                usePollStore.setState({ choices: newChoices });
-                            }
-                        }
+                    const existing = newQna.find((item) => sanitizeQnaText(item.text) === sanitizedText && item.userId === apiItem.userId);
+                    if (!existing) {
+                        newQna.push({
+                            id: apiItem.id,
+                            text: sanitizedText,
+                            upvotes: apiItem.upvotes,
+                            userId: apiItem.userId,
+                            upvoterIds: apiItem.upvoterIds || []
+                        });
+                        updated = true;
+                        return;
                     }
+
+                    if (apiItem.upvotes > existing.upvotes) {
+                        existing.upvotes = apiItem.upvotes;
+                        existing.upvoterIds = apiItem.upvoterIds || [];
+                        updated = true;
+                    }
+                });
+
+                if (updated) {
+                    usePollStore.setState({ qnaItems: limitQnaItems(newQna) });
                 }
-            } catch (error) { }
+                return;
+            }
+
+            const res = await fetch(`/api/vote?hostId=${hostId}`, { cache: "no-store", signal });
+            if (!res.ok) return;
+
+            const data: VoteSyncResponse = await res.json();
+            if (!data.votes) return;
+
+            const currentChoices = usePollStore.getState().choices;
+            let updated = false;
+            const newChoices = [...currentChoices];
+
+            Object.entries(data.votes).forEach(([key, apiVotes]) => {
+                const activePollType = usePollStore.getState().pollType;
+                if (activePollType === 'word-cloud') {
+                    const lowerKey = key.toLowerCase();
+                    const existing = newChoices.find((choice) => choice.label.toLowerCase() === lowerKey);
+                    if (existing) {
+                        if (apiVotes > existing.votes) {
+                            existing.votes = apiVotes;
+                            updated = true;
+                        }
+                        return;
+                    }
+
+                    newChoices.push({ id: randomId(), label: key, votes: apiVotes });
+                    updated = true;
+                    return;
+                }
+
+                const existing = newChoices.find((choice) => choice.id === key);
+                if (existing && apiVotes > existing.votes) {
+                    existing.votes = apiVotes;
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                usePollStore.setState({ choices: newChoices });
+            }
+        } catch (error) {
+            if (!(error instanceof DOMException && error.name === "AbortError")) {
+                console.error("Fallback sync failed:", error);
+            }
+        } finally {
+            fallbackSyncInFlightRef.current = false;
+        }
+    }, [hostId]);
+
+    useEffect(() => {
+        if (!isMounted || storedHostId !== hostId || status === 'closed') return;
+
+        let cancelled = false;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let activeController: AbortController | null = null;
+
+        const poll = async () => {
+            if (cancelled) return;
+
+            activeController = new AbortController();
+            await syncFallbackState(activeController.signal);
+
+            if (!cancelled) {
+                timeoutId = setTimeout(poll, FALLBACK_SYNC_INTERVAL_MS);
+            }
         };
 
-        const interval = setInterval(syncVotes, 3000);
-        syncVotes();
+        void poll();
 
-        return () => clearInterval(interval);
-    }, [isMounted, storedHostId, hostId]);
+        return () => {
+            cancelled = true;
+            activeController?.abort();
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [hostId, isMounted, status, storedHostId, syncFallbackState]);
 
     // Poll emoji API every second as fallback for PeerJS
     useEffect(() => {
@@ -308,9 +356,9 @@ export default function HostDashboard() {
                         <h2 className="text-xl font-semibold">Join the Poll</h2>
                         <div className="bg-white p-4 rounded-xl">
                             {joinUrl ? (
-                                <QRCodeSVG value={joinUrl} size={150} />
+                                <QRCodeSVG value={joinUrl} size={150} role="img" aria-label="QR code for joining the poll" title="QR code for joining the poll" />
                             ) : (
-                                <div className="w-[150px] h-[150px] bg-gray-100 animate-pulse rounded-xl" />
+                                <div className="w-[150px] h-[150px] bg-gray-100 animate-pulse rounded-xl" aria-hidden="true" />
                             )}
                         </div>
                         <div className="w-full">
@@ -318,7 +366,7 @@ export default function HostDashboard() {
                                 onClick={handleCopy}
                                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-background/50 border border-border hover:bg-white/5 transition-all text-sm font-medium"
                             >
-                                {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                                 {copied ? "Copied Link" : "Copy Join Link"}
                             </button>
                         </div>
@@ -401,6 +449,7 @@ export default function HostDashboard() {
                                 <p className="text-foreground/70 mt-2">Final results are locked.</p>
                                 <button
                                     onClick={() => setStatus('open')}
+                                    aria-label="Reopen the closed session"
                                     className="mt-6 text-sm text-primary underline"
                                 >
                                     Reopen Session

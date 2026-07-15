@@ -76,17 +76,18 @@ export default function Home() {
               <button
                 key={card.type}
                 onClick={() => router.push(`/create?type=${card.type}`)}
+                aria-label={`Create a ${card.title} session`}
                 className={`glass group relative p-6 rounded-2xl border text-left flex flex-col items-start gap-4 transition-all hover:scale-[1.02] hover:-translate-y-1 hover:shadow-xl ${card.color} hover:border-current`}
               >
                 <div className={`p-4 rounded-xl bg-background shadow-inner`}>
-                  <Icon className="w-8 h-8" />
+                  <Icon className="w-8 h-8" aria-hidden="true" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-2 text-foreground">{card.title}</h3>
                   <p className="text-foreground/70 text-sm leading-relaxed">{card.description}</p>
                 </div>
                 <div className="mt-auto pt-4 flex items-center text-sm font-semibold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-current">
-                  Create <ArrowRight className="w-4 h-4 ml-1" />
+                  Create <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
                 </div>
               </button>
             )

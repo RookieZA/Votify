@@ -4,12 +4,28 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { DataConnection, Peer } from "peerjs";
 import { z } from "zod";
 import { randomId } from "@/lib/utils";
+import type { PollType } from "@/lib/store";
 
 export type PeerPayload =
     | { type: "VOTE"; choiceId: string | string[]; voterId: string }
     | { type: "EMOJI"; emoji: string; voterId: string }
     | { type: "QNA_POST"; text: string; voterId: string }
     | { type: "QNA_UPVOTE"; id: string; voterId: string };
+
+export interface JoinQuestionPayload {
+    q: string;
+    t: PollType;
+    c: { i: string; l: string }[];
+}
+
+export type PeerControlPayload = {
+    type: "STATE_CHANGE";
+    status?: "open" | "paused" | "closed";
+    action?: "next_question";
+    data?: JoinQuestionPayload;
+};
+
+export type PeerTransportPayload = PeerPayload | PeerControlPayload;
 
 const voteSchema = z.object({
     type: z.literal("VOTE"),
@@ -54,50 +70,61 @@ export function usePeer(customId?: string, onPayload?: (payload: PeerPayload, pe
 
     useEffect(() => {
         let isMounted = true;
+        let currentPeer: Peer | null = null;
+
         if (typeof window !== "undefined") {
-            import("peerjs").then(({ default: Peer }) => {
-                if (!isMounted) return;
-                try {
-                    const id = customId || `poll-${randomId()}`;
-                    const peer = new Peer(id);
+            import("peerjs")
+                .then(({ default: Peer }) => {
+                    if (!isMounted) return;
+                    try {
+                        const id = customId || `poll-${randomId()}`;
+                        const peer = new Peer(id);
+                        currentPeer = peer;
 
-                    peer.on("open", (id) => {
-                        if (!isMounted) {
-                            peer.destroy();
-                            return;
-                        }
-                        setPeerId(id);
-                    });
-
-                    peer.on("connection", (conn) => {
-                        if (!isMounted) return;
-                        setConnections((prev) => [...prev, conn]);
-
-                        conn.on("data", (data) => {
-                            const parsed = payloadSchema.safeParse(data);
-                            if (parsed.success && onPayloadRef.current) {
-                                onPayloadRef.current(parsed.data, conn.peer);
-                            } else if (!parsed.success) {
-                                console.warn("Received invalid P2P payload format", parsed.error);
+                        peer.on("open", (id) => {
+                            if (!isMounted) {
+                                peer.destroy();
+                                return;
                             }
+                            setPeerId(id);
                         });
 
-                        conn.on("close", () => {
-                            setConnections((prev) => prev.filter((c) => c.peer !== conn.peer));
+                        peer.on("connection", (conn) => {
+                            if (!isMounted) return;
+                            setConnections((prev) => [...prev, conn]);
+
+                            conn.on("data", (data) => {
+                                const parsed = payloadSchema.safeParse(data);
+                                if (parsed.success && onPayloadRef.current) {
+                                    onPayloadRef.current(parsed.data, conn.peer);
+                                } else if (!parsed.success) {
+                                    console.warn("Received invalid P2P payload format", parsed.error);
+                                }
+                            });
+
+                            conn.on("close", () => {
+                                setConnections((prev) => prev.filter((c) => c.peer !== conn.peer));
+                            });
                         });
-                    });
 
-                    peer.on("error", (err) => {
-                        console.error("Host Peer error:", err);
-                    });
+                        peer.on("error", (err) => {
+                            console.error("Host Peer error:", err);
+                        });
 
-                    peerInstance.current = peer;
-                } catch (error) {
-                    console.error("Failed to initialize Host Peer:", error);
-                }
-            }).catch(err => {
-                console.error("Failed to load peerjs:", err);
-            });
+                        peerInstance.current = peer;
+                    } catch (error) {
+                        console.error("Failed to initialize Host Peer:", error);
+                        if (isMounted && currentPeer) {
+                            currentPeer.destroy();
+                            currentPeer = null;
+                        }
+                    }
+                })
+                .catch((err) => {
+                    if (isMounted) {
+                        console.error("Failed to load peerjs:", err);
+                    }
+                });
         }
 
         return () => {
@@ -105,10 +132,13 @@ export function usePeer(customId?: string, onPayload?: (payload: PeerPayload, pe
             if (peerInstance.current) {
                 peerInstance.current.destroy();
             }
+            if (currentPeer) {
+                currentPeer.destroy();
+            }
         };
     }, [customId]);
 
-    const broadcast = useCallback((data: any) => {
+    const broadcast = useCallback((data: PeerTransportPayload) => {
         connections.forEach((conn) => {
             if (conn.open) {
                 conn.send(data);

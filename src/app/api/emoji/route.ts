@@ -6,11 +6,14 @@ export const dynamic = "force-dynamic";
 
 // In-memory store: hostId -> array of emoji events (drained once read).
 // Uses a global guard so it survives dev HMR, consistent with the other routes.
-const globalAny = global as any;
-if (!globalAny.emojiQueues) {
-    globalAny.emojiQueues = new Map<string, { emoji: string; ts: number }[]>();
+type EmojiGlobalStore = typeof globalThis & {
+    emojiQueues?: Map<string, { emoji: string; ts: number }[]>;
+};
+const emojiGlobalStore = globalThis as EmojiGlobalStore;
+if (!emojiGlobalStore.emojiQueues) {
+    emojiGlobalStore.emojiQueues = new Map<string, { emoji: string; ts: number }[]>();
 }
-const emojiQueues: Map<string, { emoji: string; ts: number }[]> = globalAny.emojiQueues;
+const emojiQueues: Map<string, { emoji: string; ts: number }[]> = emojiGlobalStore.emojiQueues;
 
 const emojiPostSchema = z.object({
     hostId: z.string().min(1).max(100),

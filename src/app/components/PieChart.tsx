@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { motion, animate, useMotionValue, useTransform } from "framer-motion";
+import { motion, animate, useMotionValue } from "framer-motion";
 import type { Choice } from "@/lib/store";
 
 // ─── Per-theme slice palettes ─────────────────────────────────────────────────
