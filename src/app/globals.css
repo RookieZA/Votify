@@ -130,7 +130,7 @@ body::after {
 }
 
 /* Ensure page content sits above the aurora + grain layers */
-body > *:not(.aurora) {
+body > *:not(.aurora):not(.theme-switcher-container):not(.bmac-widget) {
   position: relative;
   z-index: 1;
 }

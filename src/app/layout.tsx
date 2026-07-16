@@ -42,7 +42,7 @@ export default function RootLayout({
           />
         )}
         {process.env.NEXT_PUBLIC_BUYMEACOFFEE_SLUG && (
-          <div className="fixed bottom-4 left-4 z-50">
+          <div className="bmac-widget fixed bottom-4 right-4 z-50">
             <a
               href={`https://www.buymeacoffee.com/${process.env.NEXT_PUBLIC_BUYMEACOFFEE_SLUG}`}
               target="_blank"
