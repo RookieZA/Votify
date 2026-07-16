@@ -27,15 +27,15 @@ interface PollTypeCard {
 // iOS system palette — [lighter top, base bottom] for a subtle app-icon sheen.
 const pollTypes: PollTypeCard[] = [
   {
-    type: "multiple-choice",
-    title: "Multiple Choice",
+    type: "single-choice",
+    title: "Single Choice",
     description: "Ask a question, get one answer. The classic live poll with instant results.",
     icon: BarChart2,
     gradient: ["#4da2ff", "#0a84ff"],
   },
   {
-    type: "multiple-select",
-    title: "Multiple Selection",
+    type: "multiple-choice",
+    title: "Multiple Choice",
     description: "Let people pick as many options as apply and compare the spread.",
     icon: CheckSquare,
     gradient: ["#5fdd7e", "#30d158"],
@@ -103,7 +103,7 @@ export default function Home() {
 
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
-              onClick={() => router.push(`/create?type=multiple-choice`)}
+              onClick={() => router.push(`/create?type=single-choice`)}
               className="group inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3.5 font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0"
             >
               Create a session

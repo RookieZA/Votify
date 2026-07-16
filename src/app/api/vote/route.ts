@@ -152,8 +152,8 @@ export async function POST(request: Request) {
         pollData.voters.add(voterId);
 
         if (Array.isArray(choiceId)) {
-            // Only multiple-select sends an array; ranked-choice and
-            // multiple-choice both send a single choiceId (see below).
+            // Only multiple-choice sends an array; ranked-choice and
+            // single-choice both send a single choiceId (see below).
             choiceId.forEach(id => {
                 if (!canAddNewChoice(id)) return;
                 const currentCount = pollData.votes.get(id) || 0;

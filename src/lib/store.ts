@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { randomId } from './utils';
 
-export type PollType = 'multiple-choice' | 'multiple-select' | 'word-cloud' | 'ranked-choice' | 'qna';
+export type PollType = 'single-choice' | 'multiple-choice' | 'word-cloud' | 'ranked-choice' | 'qna';
 
 export const MAX_QNA_ITEMS = 500;
 export const MAX_QNA_TEXT_LENGTH = 500;
@@ -70,7 +70,7 @@ export const usePollStore = create<PollState>()(
     persist(
         (set, get) => ({
             hostId: null,
-            pollType: 'multiple-choice',
+            pollType: 'single-choice',
             status: 'open',
             resultsHidden: false,
 
@@ -104,11 +104,11 @@ export const usePollStore = create<PollState>()(
 
                 // If a voterId is provided and they already voted on this question (except for QnA and word clouds where they can submit multiple)
                 if (voterId && state.votedUsers.includes(voterId) && state.pollType !== 'qna' && state.pollType !== 'word-cloud') {
-                    // For multiple-select, maybe array payload is sent at once, so it's fine.
+                    // For multiple-choice, the array payload is sent at once, so it's fine.
                     return;
                 }
 
-                if (state.pollType === 'multiple-select' && Array.isArray(payload)) {
+                if (state.pollType === 'multiple-choice' && Array.isArray(payload)) {
                     // payload is array of choiceIds
                     set({
                         choices: state.choices.map(c =>
@@ -134,7 +134,7 @@ export const usePollStore = create<PollState>()(
                         });
                     }
                 } else if (typeof payload === 'string') {
-                    // Default: multiple-choice and ranked-choice both cast a single
+                    // Default: single-choice and ranked-choice both cast a single
                     // vote for one choice; ranked-choice's ranking comes purely from
                     // sorting by vote count, not per-vote weighting.
                     set({

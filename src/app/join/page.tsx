@@ -10,7 +10,7 @@ import { CheckCircle2, AlertTriangle, Loader2, Send, Lock, Pause } from "lucide-
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/app/components/Logo";
 
-const POLL_TYPES = ['multiple-choice', 'multiple-select', 'word-cloud', 'ranked-choice', 'qna'] as const;
+const POLL_TYPES = ['single-choice', 'multiple-choice', 'word-cloud', 'ranked-choice', 'qna'] as const;
 
 // Shape of the poll payload carried in the join URL / host broadcasts. Both come
 // from an untrusted source (crafted URL, or any peer acting as host), so validate.
@@ -62,7 +62,7 @@ function JoinScreen() {
         if (msg.status) setHostStatus(msg.status);
         if (msg.action === "next_question" && msg.data) {
             // The Host advanced the poll
-            setPoll({ t: 'multiple-choice', ...msg.data } as JoinQuestion);
+            setPoll({ t: 'single-choice', ...msg.data } as JoinQuestion);
             setVoted(false);
             setWordSubmitted(false);
             setSelectedId(null);
@@ -81,8 +81,8 @@ function JoinScreen() {
             const decoded = decodeData<unknown>(dataB64);
             const parsed = joinQuestionSchema.safeParse(decoded);
             if (parsed.success) {
-                // If it's an older payload without 't', default to multiple-choice
-                setPoll({ t: 'multiple-choice', ...parsed.data } as JoinQuestion);
+                // If it's an older payload without 't', default to single-choice
+                setPoll({ t: 'single-choice', ...parsed.data } as JoinQuestion);
             } else {
                 setError("Invalid poll data.");
             }
@@ -100,10 +100,10 @@ function JoinScreen() {
         if (voted || hostStatus !== 'open' || isSubmittingRef.current) return;
 
         let payloadContent: string | string[] | null = null;
-        if (poll.t === 'multiple-choice' || poll.t === 'ranked-choice') {
+        if (poll.t === 'single-choice' || poll.t === 'ranked-choice') {
             if (!selectedId) return;
             payloadContent = selectedId;
-        } else if (poll.t === 'multiple-select') {
+        } else if (poll.t === 'multiple-choice') {
             if (selectedIds.length === 0) return;
             payloadContent = selectedIds;
         } else if (poll.t === 'word-cloud') {
@@ -208,8 +208,8 @@ function JoinScreen() {
     }
 
     const isSubmitDisabled = voted || hostStatus !== 'open' || isSubmitting ||
-        ((poll.t === 'multiple-choice' || poll.t === 'ranked-choice') && !selectedId) ||
-        (poll.t === 'multiple-select' && selectedIds.length === 0) ||
+        ((poll.t === 'single-choice' || poll.t === 'ranked-choice') && !selectedId) ||
+        (poll.t === 'multiple-choice' && selectedIds.length === 0) ||
         ((poll.t === 'word-cloud' || poll.t === 'qna') && textInput.trim().length === 0);
 
     return (
@@ -255,7 +255,7 @@ function JoinScreen() {
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     className="space-y-4"
                                 >
-                                    {(poll.t === 'multiple-choice' || poll.t === 'ranked-choice') && (
+                                    {(poll.t === 'single-choice' || poll.t === 'ranked-choice') && (
                                         <>
                                             {poll.t === 'ranked-choice' && (
                                                 <p className="text-sm text-foreground/60">
@@ -281,7 +281,7 @@ function JoinScreen() {
                                         </>
                                     )}
 
-                                    {poll.t === 'multiple-select' && poll.c.map((choice) => (
+                                    {poll.t === 'multiple-choice' && poll.c.map((choice) => (
                                         <button
                                             key={choice.i}
                                             onClick={() => {

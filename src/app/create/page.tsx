@@ -36,11 +36,11 @@ function createInitialQuestions(isChoicesNeeded: boolean): QuestionData[] {
 function CreateForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const type = (searchParams.get("type") as PollType) || "multiple-choice";
+    const type = (searchParams.get("type") as PollType) || "single-choice";
 
     const setPoll = usePollStore((state) => state.setPoll);
 
-    const isChoicesNeeded = ["multiple-choice", "multiple-select", "ranked-choice"].includes(type);
+    const isChoicesNeeded = ["single-choice", "multiple-choice", "ranked-choice"].includes(type);
 
     // Support for multiple questions in a single session
     const [questions, setQuestions] = useState<QuestionData[]>(() => createInitialQuestions(isChoicesNeeded));
@@ -122,8 +122,8 @@ function CreateForm() {
     };
 
     const typeLabels: Record<PollType, string> = {
+        "single-choice": "Single Choice",
         "multiple-choice": "Multiple Choice",
-        "multiple-select": "Multiple Selection",
         "word-cloud": "Word Cloud",
         "ranked-choice": "Ranked Choice",
         "qna": "Q&A Board"
@@ -131,8 +131,8 @@ function CreateForm() {
 
     // Short labels for the segmented type picker
     const typeOptions: { id: PollType; label: string }[] = [
+        { id: "single-choice", label: "Single Choice" },
         { id: "multiple-choice", label: "Multiple Choice" },
-        { id: "multiple-select", label: "Multi-Select" },
         { id: "word-cloud", label: "Word Cloud" },
         { id: "ranked-choice", label: "Ranked" },
         { id: "qna", label: "Q&A" },
@@ -140,7 +140,7 @@ function CreateForm() {
 
     const handleTypeChange = (newType: PollType) => {
         if (newType === type) return;
-        const needsChoices = ["multiple-choice", "multiple-select", "ranked-choice"].includes(newType);
+        const needsChoices = ["single-choice", "multiple-choice", "ranked-choice"].includes(newType);
         if (needsChoices) {
             // Ensure every question has at least two option slots when switching
             // into a format that requires options.

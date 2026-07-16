@@ -233,7 +233,7 @@ export default function HostDashboard() {
         const questionData = {
             q: question,
             t: pollType,
-            c: ['multiple-choice', 'multiple-select', 'ranked-choice'].includes(pollType) ? choices.map(c => ({ i: c.id, l: c.label })) : []
+            c: ['single-choice', 'multiple-choice', 'ranked-choice'].includes(pollType) ? choices.map(c => ({ i: c.id, l: c.label })) : []
         };
         const b64 = encodeData(questionData);
         return `${origin}/join?peerId=${hostId}&d=${b64}`;
@@ -277,7 +277,7 @@ export default function HostDashboard() {
                 data: {
                     q: state.question,
                     t: state.pollType,
-                    c: ['multiple-choice', 'multiple-select', 'ranked-choice'].includes(state.pollType) ? state.choices.map(c => ({ i: c.id, l: c.label })) : []
+                    c: ['single-choice', 'multiple-choice', 'ranked-choice'].includes(state.pollType) ? state.choices.map(c => ({ i: c.id, l: c.label })) : []
                 }
             });
         }, 100);
@@ -484,7 +484,7 @@ export default function HostDashboard() {
                         ) : (
                             <div className="flex-1 w-full flex items-center justify-center">
                                 {/* Type-specific visualizations */}
-                                {['multiple-choice', 'multiple-select'].includes(pollType) && (
+                                {['single-choice', 'multiple-choice'].includes(pollType) && (
                                     <div className="w-full max-w-3xl mx-auto">
                                         <BarResults choices={choices} />
                                     </div>
