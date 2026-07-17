@@ -8,6 +8,7 @@ import { usePollStore, useHistoryStore, QnaItem, limitQnaItems, sanitizeQnaText 
 import { usePeer } from "@/hooks/usePeer";
 import { encodeData, randomId } from "@/lib/utils";
 import BarResults, { usePalette } from "@/app/components/BarResults";
+import WordBubbles from "@/app/components/WordBubbles";
 import { Logo } from "@/app/components/Logo";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -497,31 +498,13 @@ export default function HostDashboard() {
                                 )}
 
                                 {pollType === 'word-cloud' && (
-                                    <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 w-full h-full p-4 md:p-8 content-center">
-                                        {choices.length === 0 ? (
-                                            <p className="text-foreground/45 animate-pulse">Waiting for the first word…</p>
-                                        ) : (
-                                            (() => {
-                                                const maxVotes = Math.max(...choices.map(x => x.votes));
-                                                return choices.map((c, i) => {
-                                                    const weight = maxVotes === 0 ? 0 : c.votes / maxVotes;
-                                                    const size = 1.25 + weight * 3.75; // 1.25rem → 5rem
-                                                    return (
-                                                        <motion.span
-                                                            key={c.id}
-                                                            layout
-                                                            initial={{ opacity: 0, scale: 0.3 }}
-                                                            animate={{ opacity: 0.55 + weight * 0.45, scale: 1 }}
-                                                            transition={{ type: "spring", stiffness: 240, damping: 20 }}
-                                                            style={{ fontSize: `${size}rem`, lineHeight: 1.1, color: palette[i % palette.length] }}
-                                                            className="font-display font-bold tracking-tight"
-                                                        >
-                                                            {c.label}
-                                                        </motion.span>
-                                                    );
-                                                });
-                                            })()
+                                    <div className="relative w-full h-[500px]">
+                                        {choices.length === 0 && (
+                                            <p className="absolute inset-0 flex items-center justify-center text-foreground/45 animate-pulse">
+                                                Waiting for the first word…
+                                            </p>
                                         )}
+                                        <WordBubbles choices={choices} palette={palette} />
                                     </div>
                                 )}
 
